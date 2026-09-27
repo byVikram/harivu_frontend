@@ -30,8 +30,9 @@ export async function fetchProducts(options?: {
     if (options?.featuredOnly) params.append('featured', 'true');
     if (options?.category && options.category !== 'All') params.append('category', options.category);
 
+    const queryString = params.toString() ? `?${params.toString()}` : '';
     const res = await fetchWithTimeout(
-      `${API_BASE_URL}/products?${params.toString()}`,
+      `${API_BASE_URL}/products${queryString}`,
       { cache: 'no-store' },
       4000
     );
