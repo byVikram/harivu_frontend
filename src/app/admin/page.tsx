@@ -45,6 +45,10 @@ import {
 type AdminTab = "overview" | "seeding" | "products" | "offline" | "orders";
 
 export default function AdminDashboardPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passcode, setPasscode] = useState("");
+  const [authError, setAuthError] = useState(false);
+
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
@@ -52,6 +56,31 @@ export default function AdminDashboardPage() {
   const [batches, setBatches] = useState<SeedingBatch[]>([]);
   const [offlineSales, setOfflineSales] = useState<OfflineSale[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+
+  // Check persisted session
+  useEffect(() => {
+    const session = sessionStorage.getItem("harivu_admin_auth");
+    if (session === "true") {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Default Admin Passcode: harivu2026 or admin123
+    if (passcode.trim() === "harivu2026" || passcode.trim() === "admin123") {
+      sessionStorage.setItem("harivu_admin_auth", "true");
+      setIsAuthenticated(true);
+      setAuthError(false);
+    } else {
+      setAuthError(true);
+    }
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem("harivu_admin_auth");
+    setIsAuthenticated(false);
+  };
 
   // Notifications
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -241,6 +270,59 @@ export default function AdminDashboardPage() {
     }
   })();
 
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-natural-warmWhite flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-3xl p-8 border border-natural-border shadow-elevated space-y-6 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-brand-900 text-brand-300 flex items-center justify-center mx-auto shadow-sm">
+            <Sprout className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-1">
+            <h1 className="font-serif text-2xl font-bold text-natural-text">
+              Harivu Admin Command
+            </h1>
+            <p className="text-xs text-natural-muted">
+              Enter your manager passcode to access crop lifecycle and sales tools.
+            </p>
+          </div>
+
+          {authError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>Incorrect passcode. Please try again.</span>
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4 text-left">
+            <Input
+              label="Manager Passcode"
+              type="password"
+              required
+              placeholder="e.g. harivu2026"
+              value={passcode}
+              onChange={(e) => {
+                setPasscode(e.target.value);
+                setAuthError(false);
+              }}
+              helperText="Default Passcode: harivu2026 or admin123"
+            />
+
+            <Button type="submit" variant="primary" size="lg" className="w-full shadow-md">
+              Unlock Admin Command Hub
+            </Button>
+          </form>
+
+          <div className="pt-2 border-t border-natural-border/70">
+            <Link href="/" className="text-xs text-brand-900 font-semibold hover:underline">
+              ← Return to Harivu Storefront
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-natural-surface/50 text-natural-text pb-20">
       {/* Toast Feedback Alert */}
@@ -310,10 +392,18 @@ export default function AdminDashboardPage() {
             <Link
               href="/"
               target="_blank"
-              className="text-xs text-brand-300 hover:text-white underline pl-2"
+              className="text-xs text-brand-300 hover:text-white underline px-1"
             >
               View Storefront →
             </Link>
+
+            <button
+              onClick={handleLogout}
+              className="text-xs text-red-300 hover:text-red-100 font-semibold px-2.5 py-1.5 rounded-lg border border-red-900/80 bg-red-950/40"
+              title="Lock Admin Hub"
+            >
+              Lock / Exit
+            </button>
           </div>
         </div>
       </header>
