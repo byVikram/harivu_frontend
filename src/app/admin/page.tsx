@@ -195,6 +195,7 @@ export default function AdminDashboardPage() {
     display_order: 1,
     benefits: [] as string[],
     uses: [] as string[],
+    variants: [] as ProductVariant[],
   });
 
   // Load all initial admin data
@@ -320,6 +321,39 @@ export default function AdminDashboardPage() {
   // 5.1 Edit Product Handlers
   const openEditProductModal = (product: Product) => {
     setEditingProduct(product);
+    const initialVariants =
+      product.variants && product.variants.length > 0
+        ? product.variants.map((v) => ({ ...v }))
+        : [
+            {
+              id: `new-${Date.now()}-1`,
+              product_id: product.id,
+              name: "50g Regular Pack",
+              weight_grams: 50,
+              price: product.price ?? 80,
+              is_available: true,
+              is_default: true,
+            },
+            {
+              id: `new-${Date.now()}-2`,
+              product_id: product.id,
+              name: "100g Family Pack",
+              weight_grams: 100,
+              price: Math.round((product.price ?? 80) * 1.85),
+              is_available: true,
+              is_default: false,
+            },
+            {
+              id: `new-${Date.now()}-3`,
+              product_id: product.id,
+              name: "200g Chef Tray",
+              weight_grams: 200,
+              price: Math.round((product.price ?? 80) * 3.5),
+              is_available: true,
+              is_default: false,
+            },
+          ];
+
     setEditProductForm({
       id: product.id,
       name: product.name || "",
@@ -340,9 +374,53 @@ export default function AdminDashboardPage() {
       display_order: product.display_order ?? 1,
       benefits: product.benefits && Array.isArray(product.benefits) ? [...product.benefits] : [],
       uses: product.uses && Array.isArray(product.uses) ? [...product.uses] : [],
+      variants: initialVariants,
     });
     setNewBenefitInput("");
     setNewUseInput("");
+  };
+
+  const handleVariantFieldChange = (index: number, field: keyof ProductVariant, value: any) => {
+    setEditProductForm((prev) => {
+      const updated = [...prev.variants];
+      updated[index] = {
+        ...updated[index],
+        [field]: value,
+      };
+      // If marking as default, uncheck default on other variants and update base price
+      if (field === "is_default" && value === true) {
+        updated.forEach((v, i) => {
+          if (i !== index) v.is_default = false;
+        });
+        return { ...prev, variants: updated, price: updated[index].price };
+      }
+      return { ...prev, variants: updated };
+    });
+  };
+
+  const handleAddNewVariant = () => {
+    setEditProductForm((prev) => ({
+      ...prev,
+      variants: [
+        ...prev.variants,
+        {
+          id: `new-${Date.now()}`,
+          product_id: prev.id,
+          name: "100g Pack",
+          weight_grams: 100,
+          price: Math.round(prev.price * 1.8),
+          is_available: true,
+          is_default: false,
+        },
+      ],
+    }));
+  };
+
+  const handleRemoveVariantRow = (index: number) => {
+    setEditProductForm((prev) => ({
+      ...prev,
+      variants: prev.variants.filter((_, i) => i !== index),
+    }));
   };
 
   const handleAddBenefit = () => {
@@ -407,6 +485,14 @@ export default function AdminDashboardPage() {
         display_order: Number(editProductForm.display_order),
         benefits: editProductForm.benefits,
         uses: editProductForm.uses,
+        variants: editProductForm.variants.map((v) => ({
+          id: v.id,
+          name: v.name,
+          weight_grams: Number(v.weight_grams),
+          price: Number(v.price),
+          is_available: Boolean(v.is_available),
+          is_default: Boolean(v.is_default),
+        })),
       };
 
       const res = await updateAdminProduct(editProductForm.id, payload);
@@ -1900,6 +1986,132 @@ export default function AdminDashboardPage() {
                       </span>
                     </div>
                   </label>
+                </div>
+              </div>
+
+              {/* Section 2.5: Harvest Pack Sizes & Variant Pricing */}
+              <div className="space-y-3.5">
+                <div className="flex items-center justify-between border-b border-natural-border/60 pb-1.5">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-950">
+                    <ShoppingBag className="w-4 h-4 text-brand-700" />
+                    <span>Harvest Pack Sizes & Variant Pricing ({editProductForm.variants.length})</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddNewVariant}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-brand-50 hover:bg-brand-100 text-brand-950 border border-brand-200 rounded-lg text-xs font-bold transition-all shadow-2xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Pack Size</span>
+                  </button>
+                </div>
+
+                <p className="text-xs text-natural-muted">
+                  Configure the harvest pack weights (e.g. 50g, 100g, 200g) and their corresponding prices displayed on the product ordering page.
+                </p>
+
+                <div className="space-y-2.5">
+                  {editProductForm.variants.map((variant, idx) => (
+                    <div
+                      key={variant.id || idx}
+                      className="p-3.5 rounded-2xl bg-natural-surface/50 border border-natural-border flex flex-col sm:flex-row sm:items-center gap-3 justify-between"
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 flex-1">
+                        <div>
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                            Pack Label
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. 50g Regular Pack"
+                            value={variant.name}
+                            onChange={(e) =>
+                              handleVariantFieldChange(idx, "name", e.target.value)
+                            }
+                            className="w-full px-3 py-1.5 rounded-xl border border-natural-border bg-white text-xs font-semibold focus:outline-none focus:border-brand-900"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                            Weight (Grams)
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            required
+                            placeholder="50"
+                            value={variant.weight_grams}
+                            onChange={(e) =>
+                              handleVariantFieldChange(
+                                idx,
+                                "weight_grams",
+                                parseInt(e.target.value) || 50
+                              )
+                            }
+                            className="w-full px-3 py-1.5 rounded-xl border border-natural-border bg-white text-xs font-semibold focus:outline-none focus:border-brand-900"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                            Price (₹)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            required
+                            placeholder="80"
+                            value={variant.price}
+                            onChange={(e) =>
+                              handleVariantFieldChange(
+                                idx,
+                                "price",
+                                parseFloat(e.target.value) || 0
+                              )
+                            }
+                            className="w-full px-3 py-1.5 rounded-xl border border-natural-border bg-white text-xs font-bold text-brand-950 focus:outline-none focus:border-brand-900"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-natural-border/60">
+                        <label
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold cursor-pointer select-none ${
+                            variant.is_default
+                              ? "bg-brand-100 text-brand-950 border-brand-300"
+                              : "bg-white text-natural-muted border-natural-border"
+                          }`}
+                          title="Primary pack size shown by default"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={variant.is_default || false}
+                            onChange={(e) =>
+                              handleVariantFieldChange(idx, "is_default", e.target.checked)
+                            }
+                            className="w-3.5 h-3.5 rounded text-brand-900 accent-brand-900"
+                          />
+                          <span>Default</span>
+                        </label>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVariantRow(idx)}
+                          disabled={editProductForm.variants.length <= 1}
+                          className={`p-1.5 rounded-lg border text-xs transition-colors ${
+                            editProductForm.variants.length <= 1
+                              ? "opacity-30 cursor-not-allowed text-stone-400 border-stone-200"
+                              : "text-red-600 hover:bg-red-50 border-red-200 hover:border-red-300"
+                          }`}
+                          title="Delete pack size"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
