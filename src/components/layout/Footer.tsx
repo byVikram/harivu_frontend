@@ -121,11 +121,6 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/admin" className="text-brand-300 font-semibold hover:text-white transition-colors">
-                  ⚙️ Admin Command Hub
-                </Link>
-              </li>
-              <li>
                 <Link href="/contact" className="hover:text-white transition-colors">
                   Contact & Inquiries
                 </Link>
@@ -142,6 +137,7 @@ export function Footer() {
               </li>
             </ul>
           </div>
+
 
           {/* Contact Details */}
           <div className="md:col-span-3 space-y-3">

@@ -25,6 +25,7 @@ export interface Product {
   short_description: string;
   description: string;
   image_url: string;
+  video_url?: string | null;
   price: number;
   unit: string;
   is_available: boolean;
@@ -35,10 +36,15 @@ export interface Product {
   flavor_profile?: string | null;
   nutrition_highlights?: string[];
   health_benefits?: { title: string; desc: string; icon?: string }[];
+  benefits?: string[];
+  uses?: string[];
+  media_files?: { url: string; key?: string; type: string; name?: string; _id?: string }[];
+  display_order?: number;
   variants?: ProductVariant[];
   created_at?: string;
   updated_at?: string;
 }
+
 
 export interface CartItem {
   productId: string;

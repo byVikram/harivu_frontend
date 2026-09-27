@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Product, ProductVariant } from "@/lib/types";
 import { useCart } from "@/context/CartContext";
 import { formatCurrency } from "@/lib/utils";
@@ -14,6 +15,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
+  const router = useRouter();
   const { addItem } = useCart();
   const variants = product.variants || [];
   const defaultVariant = variants.find((v) => v.is_default) || variants[0] || {
@@ -28,6 +30,14 @@ export function ProductCard({ product }: ProductCardProps) {
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant>(defaultVariant);
   const [justAdded, setJustAdded] = useState(false);
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest("button") || target.closest("a")) {
+      return;
+    }
+    router.push(`/products/${product.slug}`);
+  };
+
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -36,19 +46,42 @@ export function ProductCard({ product }: ProductCardProps) {
     setTimeout(() => setJustAdded(false), 1500);
   };
 
-  return (
-    <div className="group flex flex-col rounded-3xl bg-white border border-natural-border/80 shadow-card hover:shadow-elevated transition-all duration-300 overflow-hidden hover:border-brand-400">
-      {/* Product Image Banner */}
-      <Link href={`/products/${product.slug}`} className="relative block aspect-[16/11] overflow-hidden bg-natural-surface">
-        <img
-          src={product.image_url}
-          alt={product.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          loading="lazy"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
+  const videoSrc =
+    product.video_url ||
+    product.media_files?.[0]?.url ||
+    (product as any).mediaFiles?.[0]?.url ||
+    null;
 
-        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+  return (
+    <div
+      onClick={handleCardClick}
+      className="group flex flex-col rounded-3xl bg-white border border-natural-border/80 shadow-card hover:shadow-elevated transition-all duration-300 overflow-hidden hover:border-brand-400 cursor-pointer"
+    >
+      {/* Product Living Media Banner */}
+      <div className="relative block aspect-[16/11] overflow-hidden bg-natural-surface">
+        {videoSrc ? (
+          <video
+            src={videoSrc}
+            poster={product.image_url}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+            aria-label={product.name}
+          />
+        ) : (
+          <img
+            src={product.image_url}
+            alt={product.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60 group-hover:opacity-30 transition-opacity pointer-events-none" />
+
+        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 pointer-events-none">
           <Badge variant="brand" className="backdrop-blur-md bg-white/95 shadow-xs font-bold text-[11px]">
             {product.category}
           </Badge>
@@ -60,22 +93,21 @@ export function ProductCard({ product }: ProductCardProps) {
           )}
         </div>
 
-        <div className="absolute bottom-3 left-3">
+        <div className="absolute bottom-3 left-3 pointer-events-none">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-black/60 text-white backdrop-blur-md px-2.5 py-1 rounded-full">
             <Clock className="w-3 h-3 text-brand-300" />
-            <span>{product.growing_days} Days Growth</span>
+            <span>{product.growing_days || 10} Days Growth</span>
           </span>
         </div>
-      </Link>
+      </div>
 
       {/* Content Details */}
       <div className="flex-1 p-5 flex flex-col justify-between space-y-4">
         <div className="space-y-2.5">
-          <Link href={`/products/${product.slug}`}>
-            <h3 className="font-serif text-xl font-bold text-natural-text group-hover:text-brand-900 transition-colors leading-snug">
-              {product.name}
-            </h3>
-          </Link>
+          <h3 className="font-serif text-xl font-bold text-natural-text group-hover:text-brand-900 transition-colors leading-snug flex items-center justify-between">
+            <span>{product.name}</span>
+            <ArrowRight className="w-4 h-4 text-natural-muted group-hover:text-brand-700 group-hover:translate-x-1 transition-all" />
+          </h3>
           
           <p className="text-xs text-natural-muted leading-relaxed line-clamp-2">
             {product.short_description}
@@ -91,7 +123,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
         {/* Pack Size Selector Pills */}
         {variants.length > 1 && (
-          <div className="space-y-1 pt-1">
+          <div className="space-y-1 pt-1" onClick={(e) => e.stopPropagation()}>
             <span className="text-[10px] uppercase font-bold text-natural-muted tracking-wider block">
               Select Pack Size:
             </span>
@@ -100,7 +132,10 @@ export function ProductCard({ product }: ProductCardProps) {
                 <button
                   key={v.id}
                   type="button"
-                  onClick={() => setSelectedVariant(v)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedVariant(v);
+                  }}
                   className={`text-xs px-2.5 py-1 rounded-xl border transition-all ${
                     selectedVariant.id === v.id
                       ? "bg-brand-900 text-white border-brand-900 font-bold shadow-xs scale-105"
@@ -126,16 +161,19 @@ export function ProductCard({ product }: ProductCardProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            <Link href={`/products/${product.slug}`}>
+            <Link
+              href={`/products/${product.slug}`}
+              onClick={(e) => e.stopPropagation()}
+            >
               <Button variant="outline" size="sm" className="hidden sm:inline-flex text-xs py-1.5 px-3">
-                Profile
+                View Details
               </Button>
             </Link>
             <Button
               variant="primary"
               size="sm"
               onClick={handleQuickAdd}
-              className={`text-xs py-1.5 px-3.5 ${justAdded ? "bg-emerald-700" : ""}`}
+              className={`text-xs py-1.5 px-3.5 shadow-xs ${justAdded ? "bg-emerald-700" : ""}`}
             >
               {justAdded ? (
                 <>
@@ -155,3 +193,4 @@ export function ProductCard({ product }: ProductCardProps) {
     </div>
   );
 }
+

@@ -1,12 +1,11 @@
 import { Product, Order, CheckoutFormData, CartItem } from './types';
-import { INITIAL_PRODUCTS } from './mockData';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
-  timeoutMs: number = 2000
+  timeoutMs: number = 3500
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -34,34 +33,27 @@ export async function fetchProducts(options?: {
     const res = await fetchWithTimeout(
       `${API_BASE_URL}/products?${params.toString()}`,
       { cache: 'no-store' },
-      2500
+      4000
     );
 
     if (res.ok) {
       const json = await res.json();
-      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+      if (json.success && Array.isArray(json.data)) {
         return json.data;
       }
     }
-  } catch {
-    // Graceful fallback to static dataset if backend is initializing
+  } catch (err) {
+    console.error('Error fetching products from Harivu API:', err);
   }
 
-  let results = [...INITIAL_PRODUCTS];
-  if (options?.featuredOnly) {
-    results = results.filter((p) => p.is_featured);
-  }
-  if (options?.category && options.category !== 'All') {
-    results = results.filter((p) => p.category === options.category);
-  }
-  return results;
+  return [];
 }
 
 export async function fetchProductBySlug(slug: string): Promise<Product | null> {
   try {
     const res = await fetchWithTimeout(`${API_BASE_URL}/products/${slug}`, {
       cache: 'no-store',
-    }, 2500);
+    }, 4000);
 
     if (res.ok) {
       const json = await res.json();
@@ -69,13 +61,13 @@ export async function fetchProductBySlug(slug: string): Promise<Product | null> 
         return json.data;
       }
     }
-  } catch {
-    // Fallback
+  } catch (err) {
+    console.error(`Error fetching product '${slug}' from Harivu API:`, err);
   }
 
-  const found = INITIAL_PRODUCTS.find((p) => p.slug === slug);
-  return found || null;
+  return null;
 }
+
 
 export async function submitOrder(
   formData: CheckoutFormData,

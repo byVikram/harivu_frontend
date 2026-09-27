@@ -16,6 +16,7 @@ import {
   createAdminVariant,
   fetchAdminOrders,
   updateAdminOrderStatus,
+  updateAdminProduct,
   SeedingBatch,
   OfflineSale,
   AdminDashboardData,
@@ -41,6 +42,16 @@ import {
   AlertCircle,
   RefreshCw,
   Search,
+  Pencil,
+  Trash2,
+  Video,
+  Star,
+  Sparkles,
+  Check,
+  X,
+  ExternalLink,
+  Layers,
+  Eye,
 } from "lucide-react";
 
 type AdminTab = "overview" | "seeding" | "products" | "offline" | "orders";
@@ -159,6 +170,33 @@ export default function AdminDashboardPage() {
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [showAddSaleModal, setShowAddSaleModal] = useState(false);
 
+  // Edit Product Modal State
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
+  const [newBenefitInput, setNewBenefitInput] = useState("");
+  const [newUseInput, setNewUseInput] = useState("");
+  const [editProductForm, setEditProductForm] = useState({
+    id: "",
+    name: "",
+    slug: "",
+    category: "Microgreens",
+    short_description: "",
+    description: "",
+    image_url: "",
+    video_url: "",
+    price: 80,
+    unit: "50g pack",
+    growing_days: 10,
+    stock_quantity: 50,
+    is_available: true,
+    is_featured: false,
+    flavor_profile: "",
+    harvest_notes: "",
+    display_order: 1,
+    benefits: [] as string[],
+    uses: [] as string[],
+  });
+
   // Load all initial admin data
   const loadData = async () => {
     setLoading(true);
@@ -276,6 +314,113 @@ export default function AdminDashboardPage() {
       loadData();
     } else {
       showToast(res.message || "Failed to add product", "error");
+    }
+  };
+
+  // 5.1 Edit Product Handlers
+  const openEditProductModal = (product: Product) => {
+    setEditingProduct(product);
+    setEditProductForm({
+      id: product.id,
+      name: product.name || "",
+      slug: product.slug || "",
+      category: product.category || "Microgreens",
+      short_description: product.short_description || "",
+      description: product.description || "",
+      image_url: product.image_url || "",
+      video_url: product.video_url || "",
+      price: product.price ?? 80,
+      unit: product.unit || "50g pack",
+      growing_days: product.growing_days ?? 10,
+      stock_quantity: product.stock_quantity ?? 50,
+      is_available: product.is_available ?? true,
+      is_featured: product.is_featured ?? false,
+      flavor_profile: product.flavor_profile || "",
+      harvest_notes: product.harvest_notes || "",
+      display_order: product.display_order ?? 1,
+      benefits: product.benefits && Array.isArray(product.benefits) ? [...product.benefits] : [],
+      uses: product.uses && Array.isArray(product.uses) ? [...product.uses] : [],
+    });
+    setNewBenefitInput("");
+    setNewUseInput("");
+  };
+
+  const handleAddBenefit = () => {
+    const trimmed = newBenefitInput.trim();
+    if (!trimmed) return;
+    if (!editProductForm.benefits.includes(trimmed)) {
+      setEditProductForm((prev) => ({
+        ...prev,
+        benefits: [...prev.benefits, trimmed],
+      }));
+    }
+    setNewBenefitInput("");
+  };
+
+  const handleRemoveBenefit = (index: number) => {
+    setEditProductForm((prev) => ({
+      ...prev,
+      benefits: prev.benefits.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleAddUse = () => {
+    const trimmed = newUseInput.trim();
+    if (!trimmed) return;
+    if (!editProductForm.uses.includes(trimmed)) {
+      setEditProductForm((prev) => ({
+        ...prev,
+        uses: [...prev.uses, trimmed],
+      }));
+    }
+    setNewUseInput("");
+  };
+
+  const handleRemoveUse = (index: number) => {
+    setEditProductForm((prev) => ({
+      ...prev,
+      uses: prev.uses.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleSaveEditedProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editProductForm.id) return;
+    setIsSavingProduct(true);
+    try {
+      const payload = {
+        name: editProductForm.name,
+        slug: editProductForm.slug || editProductForm.name.toLowerCase().replace(/\s+/g, "-"),
+        category: editProductForm.category,
+        short_description: editProductForm.short_description,
+        description: editProductForm.description,
+        image_url: editProductForm.image_url,
+        video_url: editProductForm.video_url || null,
+        price: Number(editProductForm.price),
+        unit: editProductForm.unit,
+        growing_days: Number(editProductForm.growing_days),
+        stock_quantity: Number(editProductForm.stock_quantity),
+        is_available: Boolean(editProductForm.is_available),
+        is_featured: Boolean(editProductForm.is_featured),
+        flavor_profile: editProductForm.flavor_profile || null,
+        harvest_notes: editProductForm.harvest_notes || null,
+        display_order: Number(editProductForm.display_order),
+        benefits: editProductForm.benefits,
+        uses: editProductForm.uses,
+      };
+
+      const res = await updateAdminProduct(editProductForm.id, payload);
+      if (res.success) {
+        showToast(`Product "${editProductForm.name}" updated successfully!`);
+        setEditingProduct(null);
+        await loadData();
+      } else {
+        showToast(res.message || "Failed to update product", "error");
+      }
+    } catch (err: any) {
+      showToast(err.message || "Error updating product", "error");
+    } finally {
+      setIsSavingProduct(false);
     }
   };
 
@@ -837,10 +982,10 @@ export default function AdminDashboardPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-natural-border shadow-subtle">
               <div>
                 <h2 className="font-serif text-2xl font-bold text-natural-text">
-                  Products & Inventory Management
+                  Products & Catalogue Management
                 </h2>
                 <p className="text-xs text-natural-muted mt-1">
-                  Manage microgreen varieties, prices, growing periods, and live on-hand stock quantities.
+                  Manage live microgreen varieties, botanical descriptions, benefits, recipe ideas, pricing, and live inventory.
                 </p>
               </div>
 
@@ -850,80 +995,147 @@ export default function AdminDashboardPage() {
               </Button>
             </div>
 
-            {/* Products Table */}
+            {/* Products Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {products.map((prod) => (
                 <div
                   key={prod.id}
-                  className="p-6 rounded-3xl bg-white border border-natural-border shadow-subtle space-y-4 flex flex-col justify-between"
+                  className="p-6 rounded-3xl bg-white border border-natural-border shadow-subtle space-y-4 flex flex-col justify-between hover:shadow-elevated transition-all"
                 >
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={prod.image_url}
-                        alt={prod.name}
-                        className="w-14 h-14 rounded-2xl object-cover border border-natural-border shrink-0"
-                      />
-                      <div>
-                        <h3 className="font-serif text-lg font-bold text-natural-text">
-                          {prod.name}
-                        </h3>
+                  <div className="space-y-3.5">
+                    {/* Top Status Badges */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono font-bold text-natural-muted bg-stone-100 px-2 py-0.5 rounded-md border border-stone-200">
+                          #{prod.display_order ?? 1}
+                        </span>
                         <span className="text-[11px] font-semibold text-brand-900 bg-brand-50 px-2 py-0.5 rounded-md border border-brand-100">
                           {prod.category}
                         </span>
                       </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {prod.is_featured && (
+                          <span className="text-[10px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
+                            <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                            Featured
+                          </span>
+                        )}
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                            prod.is_available
+                              ? "text-emerald-900 bg-emerald-50 border-emerald-200"
+                              : "text-stone-500 bg-stone-100 border-stone-200"
+                          }`}
+                        >
+                          {prod.is_available ? "● Active" : "○ Hidden / Inactive"}
+                        </span>
+                      </div>
                     </div>
 
-                    <p className="text-xs text-natural-muted line-clamp-2">
-                      {prod.short_description}
-                    </p>
-
-                    <div className="p-3 bg-natural-surface/60 rounded-xl text-xs space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-natural-muted">Base Price (50g):</span>
-                        <span className="font-bold text-brand-950">{formatCurrency(prod.price)}</span>
+                    {/* Product Media & Title */}
+                    <div className="flex items-start gap-3">
+                      <div className="relative shrink-0">
+                        <img
+                          src={prod.image_url}
+                          alt={prod.name}
+                          className="w-16 h-16 rounded-2xl object-cover border border-natural-border shadow-2xs"
+                        />
+                        {prod.video_url && (
+                          <span
+                            className="absolute -bottom-1 -right-1 bg-brand-900 text-brand-100 p-1 rounded-full shadow-xs"
+                            title="Has video attached"
+                          >
+                            <Video className="w-3 h-3" />
+                          </span>
+                        )}
                       </div>
-                      <div className="flex justify-between">
+
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-serif text-lg font-bold text-natural-text truncate">
+                          {prod.name}
+                        </h3>
+                        <p className="text-[11px] font-mono text-natural-muted truncate">
+                          slug: /{prod.slug}
+                        </p>
+                        <p className="text-xs text-natural-muted line-clamp-2 mt-1">
+                          {prod.short_description || prod.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Specs Card */}
+                    <div className="p-3.5 bg-natural-surface/60 rounded-2xl text-xs space-y-1.5 border border-natural-border/60">
+                      <div className="flex justify-between items-center">
+                        <span className="text-natural-muted">Base Price:</span>
+                        <span className="font-bold text-brand-950 text-sm">
+                          {formatCurrency(prod.price)}{" "}
+                          <span className="text-[11px] font-normal text-natural-muted">
+                            / {prod.unit || "pack"}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
                         <span className="text-natural-muted">Growing Cycle:</span>
-                        <span className="font-semibold text-natural-text">{prod.growing_days} Days</span>
+                        <span className="font-semibold text-natural-text">
+                          {prod.growing_days} Days
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-[11px] pt-1 border-t border-natural-border/40">
+                        <span className="text-natural-muted">Benefits & Uses:</span>
+                        <span className="text-natural-text font-medium">
+                          {prod.benefits?.length || 0} benefits • {prod.uses?.length || 0} uses
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Stock Adjuster */}
-                  <div className="pt-3 border-t border-natural-border flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-natural-muted block">
-                        On-Hand Stock
-                      </span>
-                      <span className="font-serif text-xl font-bold text-brand-950">
-                        {prod.stock_quantity || 0} Packs
-                      </span>
+                  {/* Action & Stock Controls */}
+                  <div className="space-y-3 pt-3 border-t border-natural-border">
+                    {/* Stock stepper */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-natural-muted block">
+                          On-Hand Stock
+                        </span>
+                        <span className="font-serif text-lg font-bold text-brand-950">
+                          {prod.stock_quantity || 0} {prod.unit || "Packs"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleAdjustStock(prod.id, -5)}
+                          className="w-7 h-7 rounded-lg border border-natural-border bg-white hover:bg-natural-surface font-bold text-xs"
+                          title="Subtract 5"
+                        >
+                          -5
+                        </button>
+                        <button
+                          onClick={() => handleAdjustStock(prod.id, 5)}
+                          className="w-7 h-7 rounded-lg border border-natural-border bg-white hover:bg-natural-surface font-bold text-xs"
+                          title="Add 5"
+                        >
+                          +5
+                        </button>
+                        <button
+                          onClick={() => handleAdjustStock(prod.id, 20)}
+                          className="px-2 h-7 rounded-lg bg-brand-900 text-white font-bold text-xs hover:bg-brand-950"
+                          title="Add 20"
+                        >
+                          +20
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => handleAdjustStock(prod.id, -5)}
-                        className="w-8 h-8 rounded-lg border border-natural-border bg-white hover:bg-natural-surface font-bold text-sm"
-                        title="Subtract 5"
-                      >
-                        -5
-                      </button>
-                      <button
-                        onClick={() => handleAdjustStock(prod.id, 5)}
-                        className="w-8 h-8 rounded-lg border border-natural-border bg-white hover:bg-natural-surface font-bold text-sm"
-                        title="Add 5"
-                      >
-                        +5
-                      </button>
-                      <button
-                        onClick={() => handleAdjustStock(prod.id, 20)}
-                        className="px-2 h-8 rounded-lg bg-brand-900 text-white font-bold text-xs hover:bg-brand-950"
-                        title="Add 20"
-                      >
-                        +20
-                      </button>
-                    </div>
+                    {/* Edit Product Action Button */}
+                    <button
+                      onClick={() => openEditProductModal(prod)}
+                      className="w-full py-2.5 px-3 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-950 font-bold text-xs flex items-center justify-center gap-2 border border-brand-200 transition-all shadow-2xs hover:shadow-xs"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-brand-700" />
+                      <span>Edit Product Details & Content</span>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1475,6 +1687,475 @@ export default function AdminDashboardPage() {
                 </Button>
                 <Button variant="primary" size="md" type="submit">
                   Publish to Catalogue
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 4: EDIT PRODUCT MODAL */}
+      {/* ========================================================= */}
+      {editingProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-3xl bg-white rounded-3xl p-6 sm:p-8 shadow-elevated space-y-6 my-auto animate-scale-in max-h-[92vh] overflow-y-auto border border-natural-border">
+            {/* Header */}
+            <div className="border-b border-natural-border pb-4 flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <img
+                  src={editProductForm.image_url || "/assets/sunflower.png"}
+                  alt="Product preview"
+                  className="w-14 h-14 rounded-2xl object-cover border border-natural-border shadow-xs shrink-0"
+                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-serif text-xl font-bold text-natural-text">
+                      Edit {editProductForm.name || "Microgreen Product"}
+                    </h3>
+                    <span className="text-[10px] font-mono font-bold text-brand-900 bg-brand-50 px-2 py-0.5 rounded border border-brand-200">
+                      ID: {editProductForm.id?.slice(0, 8)}...
+                    </span>
+                  </div>
+                  <p className="text-xs text-natural-muted mt-0.5">
+                    Update live pricing, botanical specs, video/media assets, benefits, and storefront visibility.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setEditingProduct(null)}
+                className="w-8 h-8 rounded-full bg-natural-surface hover:bg-natural-border text-natural-muted hover:text-natural-text flex items-center justify-center transition-colors shrink-0"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedProduct} className="space-y-6">
+              {/* Section 1: Basic Identity */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-950 border-b border-natural-border/60 pb-1.5">
+                  <Package className="w-4 h-4 text-brand-700" />
+                  <span>1. General Details & Category</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Variety Name"
+                    required
+                    placeholder="e.g. Sunflower Microgreens"
+                    value={editProductForm.name}
+                    onChange={(e) => setEditProductForm({ ...editProductForm, name: e.target.value })}
+                  />
+
+                  <Input
+                    label="URL Slug"
+                    required
+                    placeholder="e.g. sunflower-microgreens"
+                    value={editProductForm.slug}
+                    onChange={(e) => setEditProductForm({ ...editProductForm, slug: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-natural-text uppercase tracking-wider">
+                      Category Profile
+                    </label>
+                    <select
+                      value={editProductForm.category}
+                      onChange={(e) => setEditProductForm({ ...editProductForm, category: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm font-medium focus:outline-none focus:border-brand-900"
+                    >
+                      <option value="Nutty & Crunchy">Nutty & Crunchy</option>
+                      <option value="Sweet & Tender">Sweet & Tender</option>
+                      <option value="Spicy & Peppery">Spicy & Peppery</option>
+                      <option value="Earthy & Vibrant">Earthy & Vibrant</option>
+                      <option value="Mild & Nutritious">Mild & Nutritious</option>
+                      <option value="Zesty & Bold">Zesty & Bold</option>
+                      <option value="Balanced Mix">Balanced Mix</option>
+                      <option value="Microgreens">Microgreens (General)</option>
+                    </select>
+                  </div>
+
+                  <Input
+                    label="Packaging Unit"
+                    required
+                    placeholder="e.g. 50g pack, 100g pack"
+                    value={editProductForm.unit}
+                    onChange={(e) => setEditProductForm({ ...editProductForm, unit: e.target.value })}
+                  />
+
+                  <Input
+                    label="Display Order"
+                    type="number"
+                    min={1}
+                    value={editProductForm.display_order}
+                    onChange={(e) =>
+                      setEditProductForm({
+                        ...editProductForm,
+                        display_order: parseInt(e.target.value) || 1,
+                      })
+                    }
+                    helperText="Controls sequence on /products"
+                  />
+                </div>
+              </div>
+
+              {/* Section 2: Pricing, Stock & Visibility */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-950 border-b border-natural-border/60 pb-1.5">
+                  <TrendingUp className="w-4 h-4 text-emerald-700" />
+                  <span>2. Pricing, Inventory & Storefront Visibility</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Input
+                    label="Base Price (INR ₹)"
+                    type="number"
+                    min={1}
+                    required
+                    value={editProductForm.price}
+                    onChange={(e) =>
+                      setEditProductForm({
+                        ...editProductForm,
+                        price: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                  />
+
+                  <Input
+                    label="Growing Cycle (Days)"
+                    type="number"
+                    min={3}
+                    required
+                    value={editProductForm.growing_days}
+                    onChange={(e) =>
+                      setEditProductForm({
+                        ...editProductForm,
+                        growing_days: parseInt(e.target.value) || 10,
+                      })
+                    }
+                  />
+
+                  <Input
+                    label="Live Stock Quantity"
+                    type="number"
+                    min={0}
+                    required
+                    value={editProductForm.stock_quantity}
+                    onChange={(e) =>
+                      setEditProductForm({
+                        ...editProductForm,
+                        stock_quantity: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+
+                {/* Toggles */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-natural-surface/60 border border-natural-border">
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editProductForm.is_available}
+                      onChange={(e) =>
+                        setEditProductForm({
+                          ...editProductForm,
+                          is_available: e.target.checked,
+                        })
+                      }
+                      className="w-5 h-5 rounded text-brand-900 accent-brand-900 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-natural-text block">
+                        Available for Sale
+                      </span>
+                      <span className="text-[11px] text-natural-muted">
+                        Allow customers to order this microgreen online
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editProductForm.is_featured}
+                      onChange={(e) =>
+                        setEditProductForm({
+                          ...editProductForm,
+                          is_featured: e.target.checked,
+                        })
+                      }
+                      className="w-5 h-5 rounded text-amber-600 accent-amber-600 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-natural-text block flex items-center gap-1">
+                        <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                        Featured Variety
+                      </span>
+                      <span className="text-[11px] text-natural-muted">
+                        Highlight on homepage top recommendations
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Section 3: Media & Video Assets */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-950 border-b border-natural-border/60 pb-1.5">
+                  <Video className="w-4 h-4 text-purple-700" />
+                  <span>3. Media, Images & Video Presentation</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Image Asset URL / Path"
+                    required
+                    placeholder="/assets/sunflower.png or https://..."
+                    value={editProductForm.image_url}
+                    onChange={(e) =>
+                      setEditProductForm({ ...editProductForm, image_url: e.target.value })
+                    }
+                    helperText="Local asset (e.g. /assets/sunflower.png) or web URL"
+                  />
+
+                  <Input
+                    label="Video Asset URL / Path"
+                    placeholder="/assets/sunflower_intro.mp4 or https://..."
+                    value={editProductForm.video_url}
+                    onChange={(e) =>
+                      setEditProductForm({ ...editProductForm, video_url: e.target.value })
+                    }
+                    helperText="Local video (e.g. /assets/sunflower_intro.mp4) or MP4 link"
+                  />
+                </div>
+              </div>
+
+              {/* Section 4: Descriptions & Flavour Profile */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand-950 border-b border-natural-border/60 pb-1.5">
+                  <Sparkles className="w-4 h-4 text-brand-700" />
+                  <span>4. Descriptions & Flavour Profile</span>
+                </div>
+
+                <Textarea
+                  label="Short Card Description"
+                  required
+                  rows={2}
+                  placeholder="Crisp, tender sunflower shoots with a rich, nutty flavor..."
+                  value={editProductForm.short_description}
+                  onChange={(e) =>
+                    setEditProductForm({
+                      ...editProductForm,
+                      short_description: e.target.value,
+                    })
+                  }
+                  helperText="Shown on product catalogue cards and preview summaries"
+                />
+
+                <Textarea
+                  label="Full Botanical Description"
+                  required
+                  rows={3}
+                  placeholder="Sunflower microgreens are tender young shoots harvested at their peak nutritional value..."
+                  value={editProductForm.description}
+                  onChange={(e) =>
+                    setEditProductForm({
+                      ...editProductForm,
+                      description: e.target.value,
+                    })
+                  }
+                  helperText="Detailed overview displayed on the product detail page"
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Flavor Profile & Taste"
+                    placeholder="e.g. Crisp, sweet, nutty flavor"
+                    value={editProductForm.flavor_profile}
+                    onChange={(e) =>
+                      setEditProductForm({
+                        ...editProductForm,
+                        flavor_profile: e.target.value,
+                      })
+                    }
+                  />
+
+                  <Input
+                    label="Harvest & Storage Notes"
+                    placeholder="e.g. Harvested live; keep refrigerated at 4°C for 7-10 days"
+                    value={editProductForm.harvest_notes}
+                    onChange={(e) =>
+                      setEditProductForm({
+                        ...editProductForm,
+                        harvest_notes: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Section 5: Health & Nutritional Benefits (Dynamic List) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-natural-border/60 pb-1.5">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-950">
+                    <Sprout className="w-4 h-4 text-emerald-700" />
+                    <span>5. Health & Nutritional Benefits ({editProductForm.benefits.length})</span>
+                  </div>
+                  <span className="text-[11px] text-natural-muted">
+                    Click ✕ on any tag to remove
+                  </span>
+                </div>
+
+                {/* Tag Pills */}
+                {editProductForm.benefits.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {editProductForm.benefits.map((benefit, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs font-medium"
+                      >
+                        <span>✓ {benefit}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveBenefit(idx)}
+                          className="w-4 h-4 rounded-full hover:bg-emerald-200/80 text-emerald-800 flex items-center justify-center transition-colors text-[10px]"
+                          title="Remove benefit"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-natural-muted italic py-1">
+                    No specific benefits listed yet. Add one below.
+                  </p>
+                )}
+
+                {/* Add Benefit Input */}
+                <div className="flex gap-2 pt-1">
+                  <input
+                    type="text"
+                    placeholder="e.g. Rich in Vitamin E and B-complex vitamins"
+                    value={newBenefitInput}
+                    onChange={(e) => setNewBenefitInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddBenefit();
+                      }
+                    }}
+                    className="flex-1 px-4 py-2 rounded-xl border border-natural-border bg-natural-warmWhite text-xs focus:outline-none focus:border-emerald-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddBenefit}
+                    className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-colors shrink-0 shadow-xs flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Benefit</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Section 6: Culinary Uses & Recipes (Dynamic List) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-natural-border/60 pb-1.5">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-950">
+                    <Receipt className="w-4 h-4 text-amber-700" />
+                    <span>6. Culinary Uses & Recipe Ideas ({editProductForm.uses.length})</span>
+                  </div>
+                  <span className="text-[11px] text-natural-muted">
+                    Click ✕ on any tag to remove
+                  </span>
+                </div>
+
+                {/* Tag Pills */}
+                {editProductForm.uses.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {editProductForm.uses.map((use, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 text-xs font-medium"
+                      >
+                        <span>• {use}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveUse(idx)}
+                          className="w-4 h-4 rounded-full hover:bg-amber-200/80 text-amber-800 flex items-center justify-center transition-colors text-[10px]"
+                          title="Remove use"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-natural-muted italic py-1">
+                    No culinary uses listed yet. Add one below.
+                  </p>
+                )}
+
+                {/* Add Use Input */}
+                <div className="flex gap-2 pt-1">
+                  <input
+                    type="text"
+                    placeholder="e.g. Toss into fresh salads for extra crunch"
+                    value={newUseInput}
+                    onChange={(e) => setNewUseInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddUse();
+                      }
+                    }}
+                    className="flex-1 px-4 py-2 rounded-xl border border-natural-border bg-natural-warmWhite text-xs focus:outline-none focus:border-amber-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddUse}
+                    className="px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-bold transition-colors shrink-0 shadow-xs flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Use</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Form Action Buttons */}
+              <div className="pt-4 flex items-center justify-between gap-3 border-t border-natural-border">
+                <Button
+                  variant="outline"
+                  size="md"
+                  type="button"
+                  onClick={() => setEditingProduct(null)}
+                  disabled={isSavingProduct}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  variant="primary"
+                  size="md"
+                  type="submit"
+                  disabled={isSavingProduct}
+                  className="shadow-md"
+                >
+                  {isSavingProduct ? (
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Saving Changes...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4" />
+                      <span>Save Product Changes</span>
+                    </div>
+                  )}
                 </Button>
               </div>
             </form>
