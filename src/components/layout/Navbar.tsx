@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { ShoppingBag, Menu, X, Sprout } from "lucide-react";
 import { Button } from "../ui/Button";
+import { Logo } from "../ui/Logo";
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -46,22 +47,7 @@ export function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             {/* Brand Logo */}
-            <Link
-              href="/"
-              className="flex items-center gap-2.5 group focus:outline-none"
-            >
-              <div className="w-9 h-9 rounded-full bg-brand-900 flex items-center justify-center text-natural-warmWhite shadow-sm group-hover:scale-105 transition-transform duration-200">
-                <Sprout className="w-5 h-5 text-brand-300" />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-serif text-xl font-bold tracking-tight text-brand-950">
-                  HARIVU
-                </span>
-                <span className="text-[10px] tracking-widest text-brand-800 font-semibold uppercase -mt-1">
-                  Fresh Microgreens
-                </span>
-              </div>
-            </Link>
+            <Logo size="md" />
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-7">

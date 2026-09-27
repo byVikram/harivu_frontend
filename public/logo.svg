@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 140" fill="none">
+  <!-- Botanical Emblem (Left) -->
+  <g transform="translate(10, 10)">
+    <!-- Dark Green Arch/Semicircle -->
+    <path d="M0 0 H20 C75.228 0 120 44.772 120 100 C120 111.046 111.046 120 100 120 H0 V0 Z" fill="#14532D"/>
+    
+    <!-- Botanical Leaf 1 (Top Left) -->
+    <path d="M0 80 Q 25 25 50 18 Q 40 45 10 90 Z" fill="#F4F1EA"/>
+    
+    <!-- Botanical Leaf 2 (Upper Middle) -->
+    <path d="M0 100 Q 35 40 70 36 Q 55 65 15 110 Z" fill="#F4F1EA"/>
+    
+    <!-- Botanical Leaf 3 (Center) -->
+    <path d="M0 115 Q 45 55 90 60 Q 70 85 20 120 Z" fill="#F4F1EA"/>
+    
+    <!-- Botanical Leaf 4 (Bottom Fan) -->
+    <path d="M10 120 Q 55 80 105 92 Q 85 110 35 120 Z" fill="#F4F1EA"/>
+  </g>
+
+  <!-- HARIVU High-Contrast Typography (Right) -->
+  <g fill="#14532D">
+    <!-- H -->
+    <path d="M165 38 H176 V74 H205 V38 H216 V112 H205 V84 H176 V112 H165 V38 Z"/>
+    
+    <!-- A -->
+    <path d="M260 38 H272 L298 112 H286 L280 94 H252 L246 112 H234 L260 38 Z M266 52 L255 84 H277 L266 52 Z"/>
+    
+    <!-- R -->
+    <path d="M325 38 H355 C369 38 379 47 379 61 C379 72 371 80 360 83 L382 112 H368 L348 85 H336 V112 H325 V38 Z M336 48 V75 H354 C362 75 368 70 368 62 C368 53 362 48 354 48 H336 Z"/>
+    
+    <!-- I -->
+    <path d="M410 38 H421 V112 H410 V38 Z"/>
+    
+    <!-- V -->
+    <path d="M448 38 H460 L480 98 L500 38 H512 L486 112 H474 L448 38 Z"/>
+    
+    <!-- U -->
+    <path d="M538 38 H549 V82 C549 98 560 105 572 105 C584 105 595 98 595 82 V38 H606 V82 C606 104 590 115 572 115 C554 115 538 104 538 82 V38 Z" transform="translate(-8, 0)"/>
+  </g>
+</svg>

@@ -24,6 +24,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import { Logo } from "@/components/ui/Logo";
 import {
   Sprout,
   LayoutDashboard,
@@ -306,13 +307,13 @@ export default function AdminDashboardPage() {
     return (
       <div className="min-h-screen bg-natural-warmWhite flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-white rounded-3xl p-8 border border-natural-border shadow-elevated space-y-6 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-brand-900 text-brand-300 flex items-center justify-center mx-auto shadow-sm">
-            <Sprout className="w-8 h-8" />
+          <div className="flex justify-center pb-2">
+            <Logo size="md" />
           </div>
 
           <div className="space-y-1">
             <h1 className="font-serif text-2xl font-bold text-natural-text">
-              Harivu Admin Command
+              Admin Command Hub
             </h1>
             <p className="text-xs text-natural-muted">
               Enter your manager passcode to access crop lifecycle and sales tools.
@@ -393,20 +394,10 @@ export default function AdminDashboardPage() {
       <header className="bg-brand-950 text-natural-warmWhite border-b border-brand-900 px-4 sm:px-8 py-5 shadow-sm sticky top-0 z-30">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-800 flex items-center justify-center text-brand-300 shadow-inner">
-              <Sprout className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-serif text-xl font-bold tracking-tight">HARIVU</h1>
-                <span className="text-[11px] uppercase font-bold tracking-widest bg-brand-800 text-brand-200 px-2 py-0.5 rounded-full border border-brand-700">
-                  Admin Command
-                </span>
-              </div>
-              <p className="text-xs text-brand-200/70">
-                Seeding Batches, Harvest Lifecycle & Multi-Channel Sales
-              </p>
-            </div>
+            <Logo variant="light" size="sm" showTagline={false} linkToHome={false} />
+            <span className="text-[11px] uppercase font-bold tracking-widest bg-brand-800 text-brand-200 px-2.5 py-1 rounded-full border border-brand-700">
+              Admin Command Hub
+            </span>
           </div>
 
           <div className="flex items-center gap-2.5">
