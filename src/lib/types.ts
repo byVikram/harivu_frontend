@@ -34,6 +34,7 @@ export interface Product {
   harvest_notes?: string | null;
   flavor_profile?: string | null;
   nutrition_highlights?: string[];
+  health_benefits?: { title: string; desc: string; icon?: string }[];
   variants?: ProductVariant[];
   created_at?: string;
   updated_at?: string;

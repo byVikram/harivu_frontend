@@ -254,8 +254,22 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
 
-  // Look up specific benefits
-  const specificBenefits = VARIETY_BENEFITS[product.slug] || {
+  // 1. Read health benefits directly from database if populated
+  const dbBenefits = product.health_benefits && Array.isArray(product.health_benefits) && product.health_benefits.length > 0
+    ? {
+        tagline: product.flavor_profile || product.short_description,
+        highlights: product.health_benefits.map((b) => ({
+          title: b.title,
+          desc: b.desc,
+          icon: Sparkles,
+        })),
+        culinaryIdea: `Perfect for elevating artisanal toasts, gourmet salads, and fresh morning wellness bowls with raw living vitality.`,
+        shelfLifeDays: product.growing_days ? Math.min(10, product.growing_days) : 8,
+      }
+    : null;
+
+  // 2. Fallback to variety dictionary if DB has not populated yet
+  const specificBenefits = dbBenefits || VARIETY_BENEFITS[product.slug] || {
     tagline: product.short_description,
     highlights: [
       {
