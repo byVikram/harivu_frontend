@@ -1,10 +1,13 @@
 import { Product, Order, CheckoutFormData, CartItem } from './types';
 import { INITIAL_PRODUCTS } from './mockData';
-import { supabase } from './supabase';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = 1000): Promise<Response> {
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = 2000
+): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -23,15 +26,16 @@ export async function fetchProducts(options?: {
   featuredOnly?: boolean;
   category?: string;
 }): Promise<Product[]> {
-  // 1. Try Flask Backend API with quick timeout
   try {
     const params = new URLSearchParams();
     if (options?.featuredOnly) params.append('featured', 'true');
     if (options?.category && options.category !== 'All') params.append('category', options.category);
 
-    const res = await fetchWithTimeout(`${API_BASE_URL}/products?${params.toString()}`, {
-      cache: 'no-store',
-    }, 1500);
+    const res = await fetchWithTimeout(
+      `${API_BASE_URL}/products?${params.toString()}`,
+      { cache: 'no-store' },
+      2500
+    );
 
     if (res.ok) {
       const json = await res.json();
@@ -40,30 +44,9 @@ export async function fetchProducts(options?: {
       }
     }
   } catch {
-    // Proceed to Supabase direct check or fallback
+    // Graceful fallback to static dataset if backend is initializing
   }
 
-  // 2. Try direct Supabase client if available
-  if (supabase) {
-    try {
-      let query = supabase
-        .from('products')
-        .select('*, variants:product_variants(*)')
-        .eq('is_available', true);
-
-      if (options?.featuredOnly) query = query.eq('is_featured', true);
-      if (options?.category && options.category !== 'All') query = query.eq('category', options.category);
-
-      const { data, error } = await query;
-      if (!error && data && data.length > 0) {
-        return data as Product[];
-      }
-    } catch {
-      // Fallback
-    }
-  }
-
-  // 3. Robust Static Fallback
   let results = [...INITIAL_PRODUCTS];
   if (options?.featuredOnly) {
     results = results.filter((p) => p.is_featured);
@@ -75,11 +58,11 @@ export async function fetchProducts(options?: {
 }
 
 export async function fetchProductBySlug(slug: string): Promise<Product | null> {
-  // 1. Try Flask Backend API
   try {
     const res = await fetchWithTimeout(`${API_BASE_URL}/products/${slug}`, {
       cache: 'no-store',
-    }, 1500);
+    }, 2500);
+
     if (res.ok) {
       const json = await res.json();
       if (json.success && json.data) {
@@ -90,24 +73,6 @@ export async function fetchProductBySlug(slug: string): Promise<Product | null> 
     // Fallback
   }
 
-  // 2. Try direct Supabase
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*, variants:product_variants(*)')
-        .eq('slug', slug)
-        .maybeSingle();
-
-      if (!error && data) {
-        return data as Product;
-      }
-    } catch {
-      // Fallback
-    }
-  }
-
-  // 3. Fallback
   const found = INITIAL_PRODUCTS.find((p) => p.slug === slug);
   return found || null;
 }
