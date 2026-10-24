@@ -17,6 +17,12 @@ import {
   fetchAdminOrders,
   updateAdminOrderStatus,
   updateAdminProduct,
+  fetchOfficeInventory,
+  createOfficeInventoryItem,
+  updateOfficeInventoryItem,
+  updateOfficeInventoryCount,
+  deleteOfficeInventoryItem,
+  OfficeInventoryItem,
   SeedingBatch,
   OfflineSale,
   AdminDashboardData,
@@ -34,6 +40,7 @@ import {
   Receipt,
   ShoppingBag,
   Plus,
+  Minus,
   CheckCircle2,
   Clock,
   Scissors,
@@ -52,9 +59,14 @@ import {
   ExternalLink,
   Layers,
   Eye,
+  Boxes,
+  MapPin,
+  Tag,
+  Wrench,
+  FolderPlus,
 } from "lucide-react";
 
-type AdminTab = "overview" | "seeding" | "products" | "offline" | "orders";
+type AdminTab = "overview" | "seeding" | "products" | "assets" | "offline" | "orders";
 
 export default function AdminDashboardPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -198,16 +210,58 @@ export default function AdminDashboardPage() {
     variants: [] as ProductVariant[],
   });
 
+  // Office Products & Equipment Inventory State
+  const [officeInventory, setOfficeInventory] = useState<OfficeInventoryItem[]>([]);
+  const [officeCategories, setOfficeCategories] = useState<string[]>([
+    "Storage & Crates",
+    "Furniture & Seating",
+    "Grow Equipment",
+    "Office & Packing"
+  ]);
+  const [selectedInventoryCategory, setSelectedInventoryCategory] = useState<string>("All");
+  const [inventorySearchQuery, setInventorySearchQuery] = useState<string>("");
+
+  const [showAddInventoryModal, setShowAddInventoryModal] = useState(false);
+  const [isCreatingNewCategory, setIsCreatingNewCategory] = useState(false);
+  const [customCategoryInput, setCustomCategoryInput] = useState("");
+  const [inventoryForm, setInventoryForm] = useState({
+    name: "",
+    category: "Storage & Crates",
+    quantity: 10,
+    unit: "crates",
+    location: "Packhouse Rack 1",
+    condition: "Good",
+    notes: "",
+  });
+
+  const [editingInventoryItem, setEditingInventoryItem] = useState<OfficeInventoryItem | null>(null);
+  const [isEditCreatingNewCategory, setIsEditCreatingNewCategory] = useState(false);
+  const [editCustomCategoryInput, setEditCustomCategoryInput] = useState("");
+  const [editInventoryForm, setEditInventoryForm] = useState({
+    id: "",
+    name: "",
+    category: "Storage & Crates",
+    quantity: 10,
+    unit: "crates",
+    location: "",
+    condition: "Good",
+    notes: "",
+  });
+
+  const [showQuickCategoryModal, setShowQuickCategoryModal] = useState(false);
+  const [quickNewCategory, setQuickNewCategory] = useState("");
+
   // Load all initial admin data
   const loadData = async () => {
     setLoading(true);
     try {
-      const [prods, dash, batchList, salesList, orderList] = await Promise.all([
+      const [prods, dash, batchList, salesList, orderList, officeData] = await Promise.all([
         fetchProducts(),
         fetchAdminDashboard(),
         fetchBatches(),
         fetchOfflineSales(),
         fetchAdminOrders(),
+        fetchOfficeInventory(),
       ]);
 
       setProducts(prods);
@@ -215,6 +269,12 @@ export default function AdminDashboardPage() {
       setBatches(batchList);
       setOfflineSales(salesList);
       setOrders(orderList);
+      setOfficeInventory(officeData.items);
+      if (officeData.categories && officeData.categories.length > 0) {
+        setOfficeCategories((prev) => {
+          return Array.from(new Set([...prev, ...officeData.categories]));
+        });
+      }
 
       if (prods.length > 0 && !batchForm.product_id) {
         setBatchForm((prev) => ({ ...prev, product_id: prods[0].id }));
@@ -521,6 +581,172 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // 7. Office & Asset Inventory Handlers
+  const handleQuickAddCategory = (customName?: string) => {
+    const catName = (customName || quickNewCategory).trim();
+    if (!catName) {
+      showToast("Please enter a category name", "error");
+      return;
+    }
+    if (!officeCategories.includes(catName)) {
+      setOfficeCategories((prev) => [...prev, catName]);
+    }
+    setSelectedInventoryCategory(catName);
+    setQuickNewCategory("");
+    setShowQuickCategoryModal(false);
+    showToast(`Category "${catName}" added!`);
+  };
+
+  const handleCreateInventoryItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const finalCategory = isCreatingNewCategory
+      ? customCategoryInput.trim()
+      : inventoryForm.category;
+
+    if (!inventoryForm.name.trim()) {
+      showToast("Please enter an item name (e.g. Harvest Crates, Office Chairs)", "error");
+      return;
+    }
+
+    if (!finalCategory) {
+      showToast("Please select or specify a category", "error");
+      return;
+    }
+
+    try {
+      const payload = {
+        name: inventoryForm.name.trim(),
+        category: finalCategory,
+        quantity: Math.max(0, Number(inventoryForm.quantity) || 0),
+        unit: inventoryForm.unit.trim() || "units",
+        location: inventoryForm.location.trim() || undefined,
+        condition: inventoryForm.condition.trim() || "Good",
+        notes: inventoryForm.notes.trim() || undefined,
+      };
+
+      const res = await createOfficeInventoryItem(payload);
+      if (res.success) {
+        showToast(`Added "${payload.name}" to inventory (${payload.quantity} ${payload.unit})!`);
+        if (!officeCategories.includes(finalCategory)) {
+          setOfficeCategories((prev) => [...prev, finalCategory]);
+        }
+        setShowAddInventoryModal(false);
+        setIsCreatingNewCategory(false);
+        setCustomCategoryInput("");
+        setInventoryForm({
+          name: "",
+          category: finalCategory,
+          quantity: 10,
+          unit: "units",
+          location: "",
+          condition: "Good",
+          notes: "",
+        });
+        await loadData();
+      } else {
+        showToast(res.message || "Failed to create inventory item", "error");
+      }
+    } catch (err: any) {
+      showToast(err.message || "Error creating inventory item", "error");
+    }
+  };
+
+  const openEditInventoryModal = (item: OfficeInventoryItem) => {
+    setEditingInventoryItem(item);
+    setEditInventoryForm({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      quantity: item.quantity,
+      unit: item.unit,
+      location: item.location || "",
+      condition: item.condition || "Good",
+      notes: item.notes || "",
+    });
+    setIsEditCreatingNewCategory(false);
+    setEditCustomCategoryInput("");
+  };
+
+  const handleUpdateInventoryItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editInventoryForm.id) return;
+
+    const finalCategory = isEditCreatingNewCategory
+      ? editCustomCategoryInput.trim()
+      : editInventoryForm.category;
+
+    if (!editInventoryForm.name.trim()) {
+      showToast("Please enter an item name", "error");
+      return;
+    }
+
+    if (!finalCategory) {
+      showToast("Please select or specify a category", "error");
+      return;
+    }
+
+    try {
+      const payload = {
+        name: editInventoryForm.name.trim(),
+        category: finalCategory,
+        quantity: Math.max(0, Number(editInventoryForm.quantity) || 0),
+        unit: editInventoryForm.unit.trim() || "units",
+        location: editInventoryForm.location.trim() || undefined,
+        condition: editInventoryForm.condition.trim() || "Good",
+        notes: editInventoryForm.notes.trim() || undefined,
+      };
+
+      const res = await updateOfficeInventoryItem(editInventoryForm.id, payload);
+      if (res.success) {
+        showToast(`Updated "${payload.name}" in inventory!`);
+        if (!officeCategories.includes(finalCategory)) {
+          setOfficeCategories((prev) => [...prev, finalCategory]);
+        }
+        setEditingInventoryItem(null);
+        await loadData();
+      } else {
+        showToast(res.message || "Failed to update inventory item", "error");
+      }
+    } catch (err: any) {
+      showToast(err.message || "Error updating inventory item", "error");
+    }
+  };
+
+  const handleAdjustInventoryCount = async (item: OfficeInventoryItem, delta: number) => {
+    const newCount = Math.max(0, item.quantity + delta);
+    if (newCount === item.quantity) return;
+
+    // Optimistic update
+    setOfficeInventory((prev) =>
+      prev.map((i) => (i.id === item.id ? { ...i, quantity: newCount } : i))
+    );
+
+    const res = await updateOfficeInventoryCount(item.id, newCount);
+    if (res.success) {
+      showToast(`Count updated: ${item.name} is now ${newCount} ${item.unit}`);
+    } else {
+      // Revert if failed
+      setOfficeInventory((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, quantity: item.quantity } : i))
+      );
+      showToast(res.message || "Failed to update count", "error");
+    }
+  };
+
+  const handleDeleteInventoryItem = async (item: OfficeInventoryItem) => {
+    if (!window.confirm(`Are you sure you want to remove "${item.name}" (${item.quantity} ${item.unit}) from inventory?`)) {
+      return;
+    }
+
+    const res = await deleteOfficeInventoryItem(item.id);
+    if (res.success) {
+      showToast(`Removed "${item.name}" from inventory.`);
+      setOfficeInventory((prev) => prev.filter((i) => i.id !== item.id));
+    } else {
+      showToast(res.message || "Failed to delete item", "error");
+    }
+  };
+
   // Helper for batch estimated harvest preview in modal
   const selectedProduct = products.find((p) => p.id === batchForm.product_id);
   const estimatedHarvestDatePreview = (() => {
@@ -534,12 +760,30 @@ export default function AdminDashboardPage() {
     }
   })();
 
+  // Filtered inventory items and totals
+  const filteredOfficeInventory = officeInventory.filter((item) => {
+    const matchesCategory =
+      selectedInventoryCategory === "All" || item.category === selectedInventoryCategory;
+    const q = inventorySearchQuery.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      item.name.toLowerCase().includes(q) ||
+      item.category.toLowerCase().includes(q) ||
+      (item.location && item.location.toLowerCase().includes(q)) ||
+      (item.condition && item.condition.toLowerCase().includes(q)) ||
+      (item.notes && item.notes.toLowerCase().includes(q));
+    return matchesCategory && matchesSearch;
+  });
+
+  const totalOfficeUnits = officeInventory.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+  const totalOfficeCategoriesCount = Array.from(new Set(officeInventory.map((i) => i.category))).length;
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-natural-warmWhite flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-white rounded-3xl p-8 border border-natural-border shadow-elevated space-y-6 text-center">
           <div className="flex justify-center pb-2">
-            <Logo size="md" />
+            <Logo size="lg" />
           </div>
 
           <div className="space-y-1">
@@ -722,6 +966,21 @@ export default function AdminDashboardPage() {
           </button>
 
           <button
+            onClick={() => setActiveTab("assets")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-semibold transition-colors ${
+              activeTab === "assets"
+                ? "bg-white text-brand-900 border-t border-x border-natural-border shadow-xs"
+                : "text-natural-muted hover:text-natural-text"
+            }`}
+          >
+            <Boxes className="w-4 h-4" />
+            <span>Office & Farm Inventory</span>
+            <span className="text-xs bg-indigo-100 text-indigo-900 px-1.5 py-0.2 rounded-full font-bold">
+              {officeInventory.reduce((acc, curr) => acc + (curr.quantity || 0), 0)}
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveTab("offline")}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-semibold transition-colors ${
               activeTab === "offline"
@@ -830,6 +1089,43 @@ export default function AdminDashboardPage() {
                     Online: {formatCurrency(dashboard?.onlineRevenue || 0)} • Offline: {formatCurrency(dashboard?.offlineRevenue || 0)}
                   </span>
                 </div>
+              </div>
+            </div>
+
+            {/* Office & Farm Inventory Quick Banner */}
+            <div className="p-4 sm:p-5 rounded-3xl bg-indigo-950 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-subtle border border-indigo-900">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-800/80 flex items-center justify-center shrink-0 border border-indigo-700">
+                  <Boxes className="w-5 h-5 text-indigo-200" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">
+                    Office & Farm Inventory: <span className="text-indigo-300 font-extrabold">{totalOfficeUnits} Total Units</span> in {officeInventory.length} tracked items ({totalOfficeCategoriesCount} categories)
+                  </h4>
+                  <p className="text-xs text-indigo-200/80">
+                    Live counts for harvest crates, chairs, tables, microgreen trays, and equipment.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setActiveTab("assets");
+                    setShowAddInventoryModal(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-900 hover:bg-indigo-800 text-indigo-100 text-xs font-semibold transition-colors flex items-center gap-1 border border-indigo-700"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Quick Add</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab("assets")}
+                  className="px-3.5 py-1.5 rounded-xl bg-indigo-100 text-indigo-950 hover:bg-white text-xs font-bold transition-colors shadow-xs flex items-center gap-1"
+                >
+                  <span>Manage Inventory</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
 
@@ -1226,6 +1522,383 @@ export default function AdminDashboardPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 3B: OFFICE & FARM INVENTORY ASSETS */}
+        {/* ========================================================= */}
+        {activeTab === "assets" && (
+          <div className="pt-6 space-y-6 animate-scale-in">
+            {/* Header banner */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-natural-border shadow-subtle">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[11px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-800 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                    Non-Crop Physical Assets
+                  </span>
+                </div>
+                <h2 className="font-serif text-2xl font-bold text-natural-text">
+                  Office, Crates & Farm Asset Inventory
+                </h2>
+                <p className="text-xs text-natural-muted mt-1">
+                  Manage physical workspace equipment, harvest crates, chairs, tables, microgreen trays, and custom supplies count.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                <Button
+                  size="md"
+                  variant="outline"
+                  onClick={() => setShowQuickCategoryModal(true)}
+                  className="border-indigo-200 text-indigo-900 hover:bg-indigo-50"
+                >
+                  <FolderPlus className="w-4 h-4 mr-1.5" />
+                  <span>+ Add Category</span>
+                </Button>
+
+                <Button
+                  size="md"
+                  variant="primary"
+                  onClick={() => setShowAddInventoryModal(true)}
+                  className="bg-indigo-700 hover:bg-indigo-800 text-white"
+                >
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  <span>+ Add Item</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Metric KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              <div className="p-5 rounded-3xl bg-white border border-natural-border shadow-subtle flex flex-col justify-between space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">
+                    Total Tracked Items
+                  </span>
+                  <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-700">
+                    <Boxes className="w-4 h-4" />
+                  </div>
+                </div>
+                <div>
+                  <span className="font-serif text-3xl font-extrabold text-natural-text">
+                    {officeInventory.length}
+                  </span>
+                  <span className="text-xs text-natural-muted block mt-0.5">
+                    Distinct equipment types
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-5 rounded-3xl bg-white border border-natural-border shadow-subtle flex flex-col justify-between space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">
+                    Total Physical Count
+                  </span>
+                  <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-700">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                </div>
+                <div>
+                  <span className="font-serif text-3xl font-extrabold text-emerald-700">
+                    {totalOfficeUnits}
+                  </span>
+                  <span className="text-xs text-natural-muted block mt-0.5">
+                    Total units in stock & in use
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-5 rounded-3xl bg-white border border-natural-border shadow-subtle flex flex-col justify-between space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">
+                    Active Categories
+                  </span>
+                  <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center text-amber-700">
+                    <Tag className="w-4 h-4" />
+                  </div>
+                </div>
+                <div>
+                  <span className="font-serif text-3xl font-extrabold text-amber-800">
+                    {totalOfficeCategoriesCount}
+                  </span>
+                  <span className="text-xs text-natural-muted block mt-0.5">
+                    Configured categories ({officeCategories.length} total)
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-5 rounded-3xl bg-white border border-natural-border shadow-subtle flex flex-col justify-between space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">
+                    Condition Health
+                  </span>
+                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-700">
+                    <Wrench className="w-4 h-4" />
+                  </div>
+                </div>
+                <div>
+                  <span className="font-serif text-3xl font-extrabold text-blue-800">
+                    {officeInventory.filter((i) => i.condition === "Good" || i.condition === "New").length} / {officeInventory.length || 0}
+                  </span>
+                  <span className="text-xs text-natural-muted block mt-0.5">
+                    Items in Good or New condition
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter and Category Pills Toolbar */}
+            <div className="bg-white p-5 rounded-3xl border border-natural-border shadow-subtle space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                {/* Search input */}
+                <div className="relative flex-1 max-w-md">
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted" />
+                  <input
+                    type="text"
+                    placeholder="Search crates, chairs, scales, location..."
+                    value={inventorySearchQuery}
+                    onChange={(e) => setInventorySearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-8 py-2 rounded-xl border border-natural-border bg-natural-warmWhite text-xs focus:outline-none focus:border-indigo-600"
+                  />
+                  {inventorySearchQuery && (
+                    <button
+                      onClick={() => setInventorySearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-natural-muted hover:text-natural-text"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="text-xs text-natural-muted">
+                  Showing <span className="font-bold text-natural-text">{filteredOfficeInventory.length}</span> of {officeInventory.length} items
+                </div>
+              </div>
+
+              {/* Category Pills Bar */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-1">
+                <button
+                  onClick={() => setSelectedInventoryCategory("All")}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                    selectedInventoryCategory === "All"
+                      ? "bg-indigo-950 text-white shadow-xs"
+                      : "bg-natural-surface/80 text-natural-text hover:bg-natural-surface border border-natural-border"
+                  }`}
+                >
+                  <span>All</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    selectedInventoryCategory === "All" ? "bg-white/20 text-white" : "bg-white text-natural-muted"
+                  }`}>
+                    {officeInventory.length}
+                  </span>
+                </button>
+
+                {officeCategories.map((cat) => {
+                  const count = officeInventory.filter((i) => i.category === cat).length;
+                  const isSelected = selectedInventoryCategory === cat;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedInventoryCategory(cat)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                        isSelected
+                          ? "bg-indigo-700 text-white shadow-xs"
+                          : "bg-natural-surface/80 text-natural-text hover:bg-natural-surface border border-natural-border"
+                      }`}
+                    >
+                      <Tag className="w-3 h-3 opacity-70" />
+                      <span>{cat}</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                        isSelected ? "bg-white/20 text-white" : "bg-white text-natural-muted"
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                <button
+                  onClick={() => setShowQuickCategoryModal(true)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold border border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50 transition-colors shrink-0 flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Category</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Inventory Items Grid */}
+            {filteredOfficeInventory.length === 0 ? (
+              <div className="bg-white rounded-3xl border border-natural-border p-12 text-center shadow-subtle space-y-3">
+                <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center mx-auto">
+                  <Boxes className="w-6 h-6" />
+                </div>
+                <h3 className="font-serif text-lg font-bold text-natural-text">
+                  No inventory items found
+                </h3>
+                <p className="text-xs text-natural-muted max-w-sm mx-auto">
+                  {inventorySearchQuery
+                    ? `No items matching "${inventorySearchQuery}". Try clearing search or changing category.`
+                    : `No items logged in category "${selectedInventoryCategory}". Add crates, chairs, or supplies now.`}
+                </p>
+                <div className="pt-2 flex items-center justify-center gap-2">
+                  {inventorySearchQuery && (
+                    <Button size="sm" variant="outline" onClick={() => setInventorySearchQuery("")}>
+                      Clear Search
+                    </Button>
+                  )}
+                  {selectedInventoryCategory !== "All" && (
+                    <Button size="sm" variant="outline" onClick={() => setSelectedInventoryCategory("All")}>
+                      View All Categories
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => {
+                      if (selectedInventoryCategory !== "All") {
+                        setInventoryForm((prev) => ({ ...prev, category: selectedInventoryCategory }));
+                      }
+                      setShowAddInventoryModal(true);
+                    }}
+                    className="bg-indigo-700 hover:bg-indigo-800 text-white"
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    <span>Add Item</span>
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {filteredOfficeInventory.map((item) => {
+                  const conditionColor =
+                    item.condition === "New"
+                      ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                      : item.condition === "Good"
+                      ? "bg-blue-100 text-blue-800 border-blue-200"
+                      : item.condition === "Fair"
+                      ? "bg-amber-100 text-amber-800 border-amber-200"
+                      : "bg-red-100 text-red-800 border-red-200";
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-white rounded-3xl border border-natural-border shadow-subtle p-5 flex flex-col justify-between hover:shadow-md transition-all space-y-4"
+                    >
+                      {/* Top Badges */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold text-indigo-900 bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 rounded-lg flex items-center gap-1 truncate max-w-[170px]">
+                          <Tag className="w-3 h-3 text-indigo-700 shrink-0" />
+                          <span className="truncate">{item.category}</span>
+                        </span>
+
+                        <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md border ${conditionColor}`}>
+                          {item.condition || "Good"}
+                        </span>
+                      </div>
+
+                      {/* Item Main Info */}
+                      <div>
+                        <h3 className="font-serif text-lg font-bold text-natural-text leading-snug">
+                          {item.name}
+                        </h3>
+
+                        {item.location && (
+                          <div className="flex items-center gap-1.5 text-xs text-natural-muted mt-1">
+                            <MapPin className="w-3.5 h-3.5 text-natural-muted shrink-0" />
+                            <span>{item.location}</span>
+                          </div>
+                        )}
+
+                        {item.notes && (
+                          <p className="text-xs text-natural-muted/90 bg-natural-surface/60 p-2.5 rounded-xl border border-natural-border/70 mt-2.5 line-clamp-2">
+                            {item.notes}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Live Count and Stepper Card */}
+                      <div className="bg-natural-warmWhite/80 border border-natural-border rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-natural-muted block">
+                            Available Count
+                          </span>
+                          <div className="flex items-baseline gap-1.5 mt-0.5">
+                            <span className="font-serif text-2xl font-extrabold text-brand-950">
+                              {item.quantity}
+                            </span>
+                            <span className="text-xs font-semibold text-natural-muted">
+                              {item.unit || "units"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Fast Steppers */}
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleAdjustInventoryCount(item, -5)}
+                            disabled={item.quantity <= 0}
+                            className="px-2 py-1 bg-white hover:bg-natural-surface text-natural-text disabled:opacity-40 border border-natural-border rounded-lg text-xs font-bold transition-colors shadow-2xs"
+                            title="Subtract 5"
+                          >
+                            -5
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAdjustInventoryCount(item, -1)}
+                            disabled={item.quantity <= 0}
+                            className="p-1.5 bg-white hover:bg-natural-surface text-natural-text disabled:opacity-40 border border-natural-border rounded-lg text-xs font-bold transition-colors shadow-2xs"
+                            title="Subtract 1"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAdjustInventoryCount(item, 1)}
+                            className="p-1.5 bg-white hover:bg-natural-surface text-natural-text border border-natural-border rounded-lg text-xs font-bold transition-colors shadow-2xs"
+                            title="Add 1"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAdjustInventoryCount(item, 5)}
+                            className="px-2 py-1 bg-white hover:bg-natural-surface text-natural-text border border-natural-border rounded-lg text-xs font-bold transition-colors shadow-2xs"
+                            title="Add 5"
+                          >
+                            +5
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Action buttons (Edit & Delete) */}
+                      <div className="pt-2 border-t border-natural-border/70 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditInventoryModal(item)}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-natural-text hover:text-indigo-700 bg-natural-surface/60 hover:bg-indigo-50 px-3 py-1.5 rounded-xl border border-natural-border transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Edit Details</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteInventoryItem(item)}
+                          className="flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50/60 hover:bg-red-50 px-2.5 py-1.5 rounded-xl border border-red-200 transition-colors"
+                          title="Delete from Inventory"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Remove</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -2368,6 +3041,476 @@ export default function AdminDashboardPage() {
                       <span>Save Product Changes</span>
                     </div>
                   )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: ADD ASSET / INVENTORY ITEM */}
+      {showAddInventoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-natural-border shadow-elevated space-y-6 my-8">
+            <div className="flex items-center justify-between border-b border-natural-border pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
+                  <Boxes className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-xl font-bold text-natural-text">
+                    Add Office or Farm Asset
+                  </h3>
+                  <p className="text-xs text-natural-muted">
+                    Log new non-crop physical equipment, crates, furniture, or supplies
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAddInventoryModal(false)}
+                className="text-natural-muted hover:text-natural-text p-1.5 rounded-xl hover:bg-natural-surface"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateInventoryItem} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                  Item Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Harvest Crates 20L, Rolling Desk Chair, Stainless Steel Scale"
+                  value={inventoryForm.name}
+                  onChange={(e) => setInventoryForm({ ...inventoryForm, name: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600 font-medium"
+                />
+              </div>
+
+              {/* Category Selection / Creation */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-natural-muted">
+                    Category *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreatingNewCategory(!isCreatingNewCategory);
+                      if (!isCreatingNewCategory) setCustomCategoryInput("");
+                    }}
+                    className="text-xs font-semibold text-indigo-700 hover:text-indigo-900 underline flex items-center gap-1"
+                  >
+                    {isCreatingNewCategory ? "← Select Existing Category" : "+ Create New Category"}
+                  </button>
+                </div>
+
+                {isCreatingNewCategory ? (
+                  <div className="space-y-1">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Enter new category name (e.g. Packaging & Tape, Lighting, Tools)"
+                      value={customCategoryInput}
+                      onChange={(e) => setCustomCategoryInput(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-indigo-300 bg-indigo-50/40 text-sm focus:outline-none focus:border-indigo-600 font-semibold text-indigo-950"
+                      autoFocus
+                    />
+                    <p className="text-[11px] text-natural-muted">
+                      This category will be created and added to your filter tabs automatically.
+                    </p>
+                  </div>
+                ) : (
+                  <select
+                    value={inventoryForm.category}
+                    onChange={(e) => {
+                      if (e.target.value === "__NEW__") {
+                        setIsCreatingNewCategory(true);
+                      } else {
+                        setInventoryForm({ ...inventoryForm, category: e.target.value });
+                      }
+                    }}
+                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600 font-medium"
+                  >
+                    {officeCategories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                    <option value="__NEW__">+ Add Custom Category...</option>
+                  </select>
+                )}
+              </div>
+
+              {/* Quantity and Unit */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                    Count / Quantity *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    required
+                    value={inventoryForm.quantity}
+                    onChange={(e) =>
+                      setInventoryForm({ ...inventoryForm, quantity: parseInt(e.target.value) || 0 })
+                    }
+                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                    Unit of Measure *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. crates, chairs, trays, pcs, units"
+                    value={inventoryForm.unit}
+                    onChange={(e) => setInventoryForm({ ...inventoryForm, unit: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600"
+                  />
+                </div>
+              </div>
+
+              {/* Location and Condition */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                    Physical Location
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Packhouse Rack 2, Office Room A"
+                    value={inventoryForm.location}
+                    onChange={(e) => setInventoryForm({ ...inventoryForm, location: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                    Condition
+                  </label>
+                  <select
+                    value={inventoryForm.condition}
+                    onChange={(e) => setInventoryForm({ ...inventoryForm, condition: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600 font-medium"
+                  >
+                    <option value="New">New (Mint)</option>
+                    <option value="Good">Good (Working)</option>
+                    <option value="Fair">Fair (Operational)</option>
+                    <option value="Needs Repair">Needs Repair / Maintenance</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                  Notes / Specifications (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Dimensions, brand name, purchase date, or maintenance notes"
+                  value={inventoryForm.notes}
+                  onChange={(e) => setInventoryForm({ ...inventoryForm, notes: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-xs focus:outline-none focus:border-indigo-600"
+                />
+              </div>
+
+              {/* Modal Actions */}
+              <div className="pt-4 flex items-center justify-between gap-3 border-t border-natural-border">
+                <Button
+                  variant="outline"
+                  size="md"
+                  type="button"
+                  onClick={() => setShowAddInventoryModal(false)}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  variant="primary"
+                  size="md"
+                  type="submit"
+                  className="bg-indigo-700 hover:bg-indigo-800 text-white"
+                >
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  <span>Save Inventory Item</span>
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 6: EDIT ASSET / INVENTORY ITEM */}
+      {editingInventoryItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-natural-border shadow-elevated space-y-6 my-8">
+            <div className="flex items-center justify-between border-b border-natural-border pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-xl font-bold text-natural-text">
+                    Edit Inventory Item
+                  </h3>
+                  <p className="text-xs text-natural-muted">
+                    Update counts, location, category, or condition status
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingInventoryItem(null)}
+                className="text-natural-muted hover:text-natural-text p-1.5 rounded-xl hover:bg-natural-surface"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateInventoryItem} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                  Item Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editInventoryForm.name}
+                  onChange={(e) => setEditInventoryForm({ ...editInventoryForm, name: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600 font-medium"
+                />
+              </div>
+
+              {/* Category */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-natural-muted">
+                    Category *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditCreatingNewCategory(!isEditCreatingNewCategory);
+                      if (!isEditCreatingNewCategory) setEditCustomCategoryInput("");
+                    }}
+                    className="text-xs font-semibold text-indigo-700 hover:text-indigo-900 underline flex items-center gap-1"
+                  >
+                    {isEditCreatingNewCategory ? "← Select Existing" : "+ New Category"}
+                  </button>
+                </div>
+
+                {isEditCreatingNewCategory ? (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter new category name..."
+                    value={editCustomCategoryInput}
+                    onChange={(e) => setEditCustomCategoryInput(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-indigo-300 bg-indigo-50/40 text-sm focus:outline-none focus:border-indigo-600 font-semibold text-indigo-950"
+                    autoFocus
+                  />
+                ) : (
+                  <select
+                    value={editInventoryForm.category}
+                    onChange={(e) => {
+                      if (e.target.value === "__NEW__") {
+                        setIsEditCreatingNewCategory(true);
+                      } else {
+                        setEditInventoryForm({ ...editInventoryForm, category: e.target.value });
+                      }
+                    }}
+                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600 font-medium"
+                  >
+                    {officeCategories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                    <option value="__NEW__">+ Add Custom Category...</option>
+                  </select>
+                )}
+              </div>
+
+              {/* Count and Unit */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                    Count / Quantity *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    required
+                    value={editInventoryForm.quantity}
+                    onChange={(e) =>
+                      setEditInventoryForm({ ...editInventoryForm, quantity: parseInt(e.target.value) || 0 })
+                    }
+                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                    Unit of Measure *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editInventoryForm.unit}
+                    onChange={(e) => setEditInventoryForm({ ...editInventoryForm, unit: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600"
+                  />
+                </div>
+              </div>
+
+              {/* Location and Condition */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                    Physical Location
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Packhouse Rack 1"
+                    value={editInventoryForm.location}
+                    onChange={(e) => setEditInventoryForm({ ...editInventoryForm, location: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                    Condition
+                  </label>
+                  <select
+                    value={editInventoryForm.condition}
+                    onChange={(e) => setEditInventoryForm({ ...editInventoryForm, condition: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600 font-medium"
+                  >
+                    <option value="New">New (Mint)</option>
+                    <option value="Good">Good (Working)</option>
+                    <option value="Fair">Fair (Operational)</option>
+                    <option value="Needs Repair">Needs Repair / Maintenance</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                  Notes / Specifications
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Notes, dimensions, or upkeep notes"
+                  value={editInventoryForm.notes}
+                  onChange={(e) => setEditInventoryForm({ ...editInventoryForm, notes: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-xs focus:outline-none focus:border-indigo-600"
+                />
+              </div>
+
+              {/* Modal Actions */}
+              <div className="pt-4 flex items-center justify-between gap-3 border-t border-natural-border">
+                <Button
+                  variant="outline"
+                  size="md"
+                  type="button"
+                  onClick={() => setEditingInventoryItem(null)}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  variant="primary"
+                  size="md"
+                  type="submit"
+                  className="bg-indigo-700 hover:bg-indigo-800 text-white"
+                >
+                  <Check className="w-4 h-4 mr-1.5" />
+                  <span>Save Changes</span>
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 7: QUICK ADD CATEGORY MODAL */}
+      {showQuickCategoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 border border-natural-border shadow-elevated space-y-5">
+            <div className="flex items-center justify-between border-b border-natural-border pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
+                  <FolderPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-natural-text">
+                    Add New Category
+                  </h3>
+                  <p className="text-[11px] text-natural-muted">
+                    Organize office assets & equipment
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowQuickCategoryModal(false)}
+                className="text-natural-muted hover:text-natural-text p-1 rounded-lg hover:bg-natural-surface"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleQuickAddCategory();
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                  Category Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Harvest Crates, Office Electronics, Packaging"
+                  value={quickNewCategory}
+                  onChange={(e) => setQuickNewCategory(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600 font-semibold"
+                  autoFocus
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-between gap-2 border-t border-natural-border">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  onClick={() => setShowQuickCategoryModal(false)}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  variant="primary"
+                  size="sm"
+                  type="submit"
+                  className="bg-indigo-700 hover:bg-indigo-800 text-white"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  <span>Create Category</span>
                 </Button>
               </div>
             </form>

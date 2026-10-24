@@ -46,6 +46,8 @@ export interface AdminDashboardData {
   offlineRevenue: number;
   totalRevenue: number;
   pendingOrdersCount: number;
+  totalOfficeItems?: number;
+  totalOfficeUnits?: number;
   recentBatches: SeedingBatch[];
   readyTodayBatches: SeedingBatch[];
   recentOfflineSales: OfflineSale[];
@@ -242,3 +244,109 @@ export async function updateAdminOrderStatus(
     return { success: false, message: err.message };
   }
 }
+
+// -------------------------------------------------------------
+// Office Products & Equipment Inventory
+// -------------------------------------------------------------
+export interface OfficeInventoryItem {
+  id: string;
+  name: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  location?: string | null;
+  condition?: string | null;
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function fetchOfficeInventory(): Promise<{
+  items: OfficeInventoryItem[];
+  count: number;
+  totalUnits: number;
+  categories: string[];
+}> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/admin/inventory`, { cache: 'no-store' });
+    if (res.ok) {
+      const json = await res.json();
+      return {
+        items: json.data || [],
+        count: json.count || 0,
+        totalUnits: json.totalUnits || 0,
+        categories: json.categories || [],
+      };
+    }
+  } catch (err) {
+    console.error('Error fetching office inventory:', err);
+  }
+  return { items: [], count: 0, totalUnits: 0, categories: [] };
+}
+
+export async function createOfficeInventoryItem(data: {
+  name: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  location?: string;
+  condition?: string;
+  notes?: string;
+}): Promise<{ success: boolean; data?: OfficeInventoryItem; message?: string }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/admin/inventory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, message: err.message };
+  }
+}
+
+export async function updateOfficeInventoryItem(
+  id: string,
+  data: Partial<OfficeInventoryItem>
+): Promise<{ success: boolean; data?: OfficeInventoryItem; message?: string }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/admin/inventory/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, message: err.message };
+  }
+}
+
+export async function updateOfficeInventoryCount(
+  id: string,
+  quantity: number
+): Promise<{ success: boolean; data?: OfficeInventoryItem; message?: string }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/admin/inventory/${id}/count`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quantity }),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, message: err.message };
+  }
+}
+
+export async function deleteOfficeInventoryItem(
+  id: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/admin/inventory/${id}`, {
+      method: 'DELETE',
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, message: err.message };
+  }
+}
+

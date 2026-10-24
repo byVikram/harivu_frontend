@@ -71,7 +71,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
           {/* Brand Info */}
           <div className="md:col-span-4 space-y-4">
-            <Logo variant="light" size="md" />
+            <Logo variant="light" size="lg" />
             <p className="text-sm text-brand-200/80 leading-relaxed pr-4">
               Harivu grows fresh, living microgreens naturally from seed to harvest. We harvest to order so every leaf delivers maximum vitality, crunch, and crisp flavor straight to your table.
             </p>

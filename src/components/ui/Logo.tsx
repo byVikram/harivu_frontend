@@ -1,9 +1,10 @@
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 interface LogoProps {
-  variant?: "dark" | "light" | "auto";
-  size?: "sm" | "md" | "lg";
+  variant?: "dark" | "light" | "auto" | "original";
+  size?: "sm" | "md" | "lg" | "xl";
   showTagline?: boolean;
   className?: string;
   linkToHome?: boolean;
@@ -16,57 +17,40 @@ export function Logo({
   className = "",
   linkToHome = true,
 }: LogoProps) {
-  const isLight = variant === "light";
+  // Select the appropriate brand logo asset:
+  // - "light": White/cream transparent version for dark backgrounds (footer, admin command hub)
+  // - "original": The exact user-placed logo file with warm stone/sage background
+  // - "dark" / "auto": Transparent green version for light navigation bars and content pages
+  const logoSrc =
+    variant === "light"
+      ? "/logo/harivu-logo-white-transparent.png"
+      : variant === "original"
+      ? "/logo/harivu-logo-horizontal.png"
+      : "/logo/harivu-logo-transparent.png";
 
-  const heightClasses = {
-    sm: "h-7",
-    md: "h-9",
-    lg: "h-12",
+  const sizeClasses = {
+    sm: "h-8 sm:h-9 w-auto max-h-9",
+    md: "h-10 sm:h-12 w-auto max-h-12",
+    lg: "h-14 sm:h-16 w-auto max-h-18",
+    xl: "h-20 sm:h-24 w-auto max-h-28",
   };
 
   const content = (
-    <div className={`inline-flex items-center gap-2.5 ${className}`}>
-      {/* Official Emblem Mark */}
-      <div className={`relative ${size === "sm" ? "w-8 h-8" : size === "lg" ? "w-12 h-12" : "w-10 h-10"} shrink-0`}>
-        <svg viewBox="0 0 120 120" className="w-full h-full" fill="none">
-          {/* Semicircle Arch */}
-          <path
-            d="M0 0 H20 C75.228 0 120 44.772 120 100 C120 111.046 111.046 120 100 120 H0 V0 Z"
-            fill={isLight ? "#F4F1EA" : "#14532D"}
-          />
-          {/* Leaf Veins */}
-          <path d="M0 80 Q 25 25 50 18 Q 40 45 10 90 Z" fill={isLight ? "#0B3B24" : "#F4F1EA"} />
-          <path d="M0 100 Q 35 40 70 36 Q 55 65 15 110 Z" fill={isLight ? "#0B3B24" : "#F4F1EA"} />
-          <path d="M0 115 Q 45 55 90 60 Q 70 85 20 120 Z" fill={isLight ? "#0B3B24" : "#F4F1EA"} />
-          <path d="M10 120 Q 55 80 105 92 Q 85 110 35 120 Z" fill={isLight ? "#0B3B24" : "#F4F1EA"} />
-        </svg>
-      </div>
-
-      {/* Official Typography */}
-      <div className="flex flex-col justify-center">
-        <span
-          className={`font-serif tracking-[0.22em] font-bold leading-none ${
-            isLight ? "text-white" : "text-brand-950"
-          } ${size === "sm" ? "text-lg" : size === "lg" ? "text-3xl" : "text-2xl"}`}
-        >
-          HARIVU
-        </span>
-        {showTagline && (
-          <span
-            className={`text-[9px] sm:text-[10px] tracking-[0.25em] font-semibold uppercase mt-0.5 ${
-              isLight ? "text-brand-300" : "text-brand-900"
-            }`}
-          >
-            Fresh Microgreens
-          </span>
-        )}
-      </div>
+    <div className={`inline-flex items-center select-none ${className}`}>
+      <Image
+        src={logoSrc}
+        alt="Harivu — Where Freshness Flows"
+        width={1871}
+        height={511}
+        priority
+        className={`${sizeClasses[size] || sizeClasses.md} object-contain transition-opacity duration-200 group-hover:opacity-90`}
+      />
     </div>
   );
 
   if (linkToHome) {
     return (
-      <Link href="/" className="focus:outline-none group">
+      <Link href="/" className="inline-flex items-center focus:outline-none group" aria-label="Harivu Home">
         {content}
       </Link>
     );
