@@ -35,6 +35,10 @@ export function Navbar() {
     { name: "Contact", href: "/contact" },
   ];
 
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
+
   return (
     <>
       <header

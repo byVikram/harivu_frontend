@@ -866,20 +866,40 @@ export default function AdminDashboardPage() {
       )}
 
       {/* Admin Top Header */}
-      <header className="bg-brand-950 text-natural-warmWhite border-b border-brand-900 px-4 sm:px-8 py-5 shadow-sm sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Logo variant="light" size="sm" showTagline={false} linkToHome={false} />
-            <span className="text-[11px] uppercase font-bold tracking-widest bg-brand-800 text-brand-200 px-2.5 py-1 rounded-full border border-brand-700">
-              Admin Command Hub
-            </span>
+      <header className="bg-brand-950 text-natural-warmWhite border-b border-brand-900 px-3 sm:px-8 py-2.5 sm:py-4 shadow-sm sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Logo variant="light" size="sm" showTagline={false} linkToHome={false} />
+              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-widest bg-brand-800 text-brand-200 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-brand-700 shrink-0">
+                Admin Hub
+              </span>
+            </div>
+
+            {/* Mobile-only quick actions */}
+            <div className="flex items-center gap-1.5 md:hidden">
+              <button
+                onClick={loadData}
+                disabled={loading}
+                className="p-1.5 rounded-lg bg-brand-900 text-brand-200 hover:text-white hover:bg-brand-800 transition-colors"
+                title="Refresh Data"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              </button>
+              <button
+                onClick={handleLogout}
+                className="text-[11px] text-red-300 hover:text-red-100 font-semibold px-2 py-1 rounded-lg border border-red-900/80 bg-red-950/40"
+              >
+                Exit
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none flex-nowrap">
             <button
               onClick={loadData}
               disabled={loading}
-              className="p-2 rounded-xl bg-brand-900 text-brand-200 hover:text-white hover:bg-brand-800 transition-colors"
+              className="hidden md:flex p-2 rounded-xl bg-brand-900 text-brand-200 hover:text-white hover:bg-brand-800 transition-colors shrink-0"
               title="Refresh Data"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
@@ -887,31 +907,31 @@ export default function AdminDashboardPage() {
 
             <button
               onClick={() => setShowAddBatchModal(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-brand-100 text-brand-950 hover:bg-brand-200 px-3.5 py-2 rounded-xl transition-all shadow-xs"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-brand-100 text-brand-950 hover:bg-brand-200 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl transition-all shadow-xs shrink-0 whitespace-nowrap"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
               <span>Record Seeding</span>
             </button>
 
             <button
               onClick={() => setShowAddSaleModal(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 px-3.5 py-2 rounded-xl transition-all shadow-xs"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl transition-all shadow-xs shrink-0 whitespace-nowrap"
             >
-              <Receipt className="w-4 h-4" />
+              <Receipt className="w-3.5 h-3.5" />
               <span>Log Direct Sale</span>
             </button>
 
             <Link
               href="/"
               target="_blank"
-              className="text-xs text-brand-300 hover:text-white underline px-1"
+              className="text-xs text-brand-300 hover:text-white underline px-1.5 shrink-0 whitespace-nowrap"
             >
-              View Storefront →
+              Storefront →
             </Link>
 
             <button
               onClick={handleLogout}
-              className="text-xs text-red-300 hover:text-red-100 font-semibold px-2.5 py-1.5 rounded-lg border border-red-900/80 bg-red-950/40"
+              className="hidden md:inline-flex text-xs text-red-300 hover:text-red-100 font-semibold px-2.5 py-1.5 rounded-lg border border-red-900/80 bg-red-950/40 shrink-0"
               title="Lock Admin Hub"
             >
               Lock / Exit
@@ -921,88 +941,88 @@ export default function AdminDashboardPage() {
       </header>
 
       {/* Main Admin Navigation Tabs */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-6">
-        <div className="flex items-center gap-2 border-b border-natural-border pb-1 overflow-x-auto scrollbar-none">
+      <div className="max-w-7xl mx-auto px-3 sm:px-8 pt-3 sm:pt-6">
+        <div className="flex items-center gap-1.5 sm:gap-2 border-b border-natural-border pb-1 overflow-x-auto scrollbar-none flex-nowrap">
           <button
             onClick={() => setActiveTab("overview")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-semibold transition-colors ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs sm:text-sm font-semibold transition-colors shrink-0 whitespace-nowrap ${
               activeTab === "overview"
                 ? "bg-white text-brand-900 border-t border-x border-natural-border shadow-xs"
                 : "text-natural-muted hover:text-natural-text"
             }`}
           >
-            <LayoutDashboard className="w-4 h-4" />
+            <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span>Overview</span>
           </button>
 
           <button
             onClick={() => setActiveTab("seeding")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-semibold transition-colors ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs sm:text-sm font-semibold transition-colors shrink-0 whitespace-nowrap ${
               activeTab === "seeding"
                 ? "bg-white text-brand-900 border-t border-x border-natural-border shadow-xs"
                 : "text-natural-muted hover:text-natural-text"
             }`}
           >
-            <Calendar className="w-4 h-4" />
-            <span>Seeding & Harvest Tracker</span>
-            <span className="text-xs bg-brand-100 text-brand-900 px-1.5 py-0.2 rounded-full font-bold">
+            <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>Seeding & Harvest</span>
+            <span className="text-[10px] sm:text-xs bg-brand-100 text-brand-900 px-1.5 py-0.2 rounded-full font-bold">
               {batches.filter((b) => b.status !== "harvested").length}
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab("products")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-semibold transition-colors ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs sm:text-sm font-semibold transition-colors shrink-0 whitespace-nowrap ${
               activeTab === "products"
                 ? "bg-white text-brand-900 border-t border-x border-natural-border shadow-xs"
                 : "text-natural-muted hover:text-natural-text"
             }`}
           >
-            <Package className="w-4 h-4" />
+            <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span>Products & Stock</span>
-            <span className="text-xs bg-natural-surface text-natural-text px-1.5 py-0.2 rounded-full font-bold">
+            <span className="text-[10px] sm:text-xs bg-natural-surface text-natural-text px-1.5 py-0.2 rounded-full font-bold">
               {products.length}
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab("assets")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-semibold transition-colors ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs sm:text-sm font-semibold transition-colors shrink-0 whitespace-nowrap ${
               activeTab === "assets"
                 ? "bg-white text-brand-900 border-t border-x border-natural-border shadow-xs"
                 : "text-natural-muted hover:text-natural-text"
             }`}
           >
-            <Boxes className="w-4 h-4" />
-            <span>Office & Farm Inventory</span>
-            <span className="text-xs bg-indigo-100 text-indigo-900 px-1.5 py-0.2 rounded-full font-bold">
+            <Boxes className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>Office & Supplies</span>
+            <span className="text-[10px] sm:text-xs bg-indigo-100 text-indigo-900 px-1.5 py-0.2 rounded-full font-bold">
               {officeInventory.reduce((acc, curr) => acc + (curr.quantity || 0), 0)}
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab("offline")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-semibold transition-colors ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs sm:text-sm font-semibold transition-colors shrink-0 whitespace-nowrap ${
               activeTab === "offline"
                 ? "bg-white text-brand-900 border-t border-x border-natural-border shadow-xs"
                 : "text-natural-muted hover:text-natural-text"
             }`}
           >
-            <Receipt className="w-4 h-4" />
-            <span>Offline & Direct Sales</span>
+            <Receipt className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>Direct Sales</span>
           </button>
 
           <button
             onClick={() => setActiveTab("orders")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-semibold transition-colors ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs sm:text-sm font-semibold transition-colors shrink-0 whitespace-nowrap ${
               activeTab === "orders"
                 ? "bg-white text-brand-900 border-t border-x border-natural-border shadow-xs"
                 : "text-natural-muted hover:text-natural-text"
             }`}
           >
-            <ShoppingBag className="w-4 h-4" />
+            <ShoppingBag className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span>Online Orders</span>
-            <span className="text-xs bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded-full font-bold">
+            <span className="text-[10px] sm:text-xs bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded-full font-bold">
               {orders.filter((o) => o.status === "pending").length}
             </span>
           </button>
@@ -1277,10 +1297,90 @@ export default function AdminDashboardPage() {
               </Button>
             </div>
 
-            {/* Batches Table */}
-            <div className="bg-white rounded-3xl border border-natural-border shadow-subtle overflow-hidden">
+            {/* Mobile Batches Card View (phones & small screens) */}
+            <div className="space-y-3.5 md:hidden">
+              {batches.length === 0 ? (
+                <div className="bg-white p-6 rounded-2xl border border-natural-border text-center text-xs text-natural-muted">
+                  No seeding batches recorded yet.
+                </div>
+              ) : (
+                batches.map((batch) => {
+                  const isReady =
+                    batch.status === "ready_to_harvest" || (batch.days_until_harvest || 0) <= 0;
+
+                  return (
+                    <div
+                      key={batch.id}
+                      className="p-4 rounded-2xl bg-white border border-natural-border shadow-subtle space-y-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs font-bold text-brand-950 bg-brand-50 px-2 py-0.5 rounded border border-brand-100">
+                          {batch.batch_number}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                            batch.status === "harvested"
+                              ? "bg-stone-100 text-stone-700"
+                              : isReady
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-brand-100 text-brand-900"
+                          }`}
+                        >
+                          {batch.status.replace(/_/g, " ")}
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="font-bold text-sm text-natural-text">{batch.product_name}</h4>
+                        <p className="text-xs text-natural-muted mt-0.5">
+                          Planted: <span className="text-natural-text font-medium">{batch.seeded_date}</span> • Harvest:{" "}
+                          <span className="text-natural-text font-medium">{batch.estimated_harvest_date}</span>
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs bg-natural-surface/60 p-2.5 rounded-xl border border-natural-border/60">
+                        <div>
+                          <span className="text-natural-muted block text-[10px] uppercase font-bold">Trays</span>
+                          <span className="font-bold text-natural-text">{batch.trays_planted} Trays</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-natural-muted block text-[10px] uppercase font-bold">Expected Yield</span>
+                          <span className="font-bold text-natural-text">~{batch.expected_yield_packs} packs</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <select
+                          value={batch.status}
+                          onChange={(e) => handleUpdateBatchStatus(batch.id, e.target.value)}
+                          className="flex-1 px-3 py-2 rounded-xl border border-natural-border bg-white text-xs font-semibold focus:outline-none focus:border-brand-900"
+                        >
+                          <option value="germinating">Germinating</option>
+                          <option value="growing">Growing</option>
+                          <option value="ready_to_harvest">Ready to Harvest</option>
+                          <option value="harvested">Harvested</option>
+                          <option value="discarded">Discarded</option>
+                        </select>
+
+                        {batch.status !== "harvested" && (
+                          <button
+                            onClick={() => handleUpdateBatchStatus(batch.id, "harvested")}
+                            className="px-3 py-2 rounded-xl bg-emerald-700 text-white font-bold text-xs hover:bg-emerald-800 transition-colors shadow-xs shrink-0"
+                          >
+                            Harvest
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Desktop Batches Table (Tablets & Large screens) */}
+            <div className="hidden md:block bg-white rounded-3xl border border-natural-border shadow-subtle overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+                <table className="w-full text-left text-xs min-w-[720px] whitespace-nowrap">
                   <thead className="bg-natural-surface border-b border-natural-border text-natural-muted uppercase text-[10px] tracking-wider">
                     <tr>
                       <th className="p-4">Batch Number</th>
@@ -1923,10 +2023,64 @@ export default function AdminDashboardPage() {
               </Button>
             </div>
 
-            {/* Sales Table */}
-            <div className="bg-white rounded-3xl border border-natural-border shadow-subtle overflow-hidden">
+            {/* Mobile Sales Card View (phones & small screens) */}
+            <div className="space-y-3.5 md:hidden">
+              {offlineSales.length === 0 ? (
+                <div className="bg-white p-6 rounded-2xl border border-natural-border text-center text-xs text-natural-muted">
+                  No offline sales recorded yet.
+                </div>
+              ) : (
+                offlineSales.map((sale) => (
+                  <div
+                    key={sale.id}
+                    className="p-4 rounded-2xl bg-white border border-natural-border shadow-subtle space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-xs font-bold text-brand-950 bg-brand-50 px-2 py-0.5 rounded border border-brand-100">
+                        {sale.receipt_number}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="bg-natural-surface text-natural-text px-2 py-0.5 rounded text-[10px] font-semibold border border-natural-border">
+                          {sale.channel.replace(/_/g, " ")}
+                        </span>
+                        <span className="bg-emerald-100 text-emerald-950 px-2 py-0.5 rounded text-[10px] font-bold uppercase">
+                          {sale.payment_method}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start justify-between gap-2 pt-1">
+                      <div>
+                        <h4 className="font-bold text-sm text-natural-text">
+                          {sale.product_name}{" "}
+                          <span className="font-normal text-natural-muted text-xs">
+                            ({sale.variant_name})
+                          </span>
+                        </h4>
+                        <p className="text-xs text-natural-muted mt-0.5">
+                          {sale.sale_date} • {sale.customer_name || "Direct Customer"}{" "}
+                          {sale.customer_phone && `(${sale.customer_phone})`}
+                        </p>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="font-serif font-bold text-base text-brand-950 block">
+                          {formatCurrency(sale.total_amount)}
+                        </span>
+                        <span className="text-[11px] text-natural-muted font-medium">
+                          {sale.quantity} packs
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop Sales Table (Tablets & Large screens) */}
+            <div className="hidden md:block bg-white rounded-3xl border border-natural-border shadow-subtle overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+                <table className="w-full text-left text-xs min-w-[650px] whitespace-nowrap">
                   <thead className="bg-natural-surface border-b border-natural-border text-natural-muted uppercase text-[10px] tracking-wider">
                     <tr>
                       <th className="p-4">Receipt #</th>
@@ -1997,10 +2151,73 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* Orders Table */}
-            <div className="bg-white rounded-3xl border border-natural-border shadow-subtle overflow-hidden">
+            {/* Mobile Orders Card View (phones & small screens) */}
+            <div className="space-y-3.5 md:hidden">
+              {orders.length === 0 ? (
+                <div className="bg-white p-6 rounded-2xl border border-natural-border text-center text-xs text-natural-muted">
+                  No online orders placed yet.
+                </div>
+              ) : (
+                orders.map((ord) => (
+                  <div
+                    key={ord.id}
+                    className="p-4 rounded-2xl bg-white border border-natural-border shadow-subtle space-y-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-xs font-bold text-brand-950 bg-brand-50 px-2 py-0.5 rounded border border-brand-100">
+                        {ord.order_number}
+                      </span>
+                      <span className="font-serif font-bold text-base text-brand-950">
+                        {formatCurrency(ord.total)}
+                      </span>
+                    </div>
+
+                    <div>
+                      <p className="font-bold text-sm text-natural-text">{ord.delivery_name}</p>
+                      <p className="text-xs text-natural-muted">{ord.delivery_phone}</p>
+                      <p className="text-xs text-natural-muted mt-1 bg-natural-surface/60 p-2 rounded-xl border border-natural-border/60">
+                        📍 {ord.address}, {ord.locality}, {ord.city} - {ord.pincode}
+                      </p>
+                    </div>
+
+                    {ord.items && ord.items.length > 0 && (
+                      <div className="text-xs text-natural-muted border-t border-natural-border/60 pt-2 space-y-1">
+                        {ord.items.map((item: any, idx: number) => (
+                          <div key={idx} className="flex justify-between text-xs">
+                            <span>{item.product_name} ({item.variant_name})</span>
+                            <span className="font-semibold text-natural-text">× {item.quantity}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="pt-1">
+                      <label className="text-[10px] uppercase font-bold text-natural-muted block mb-1">
+                        Order Status
+                      </label>
+                      <select
+                        value={ord.status}
+                        onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-natural-border bg-white text-xs font-semibold focus:outline-none focus:border-brand-900"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="preparing">Preparing</option>
+                        <option value="harvested">Harvested</option>
+                        <option value="out_for_delivery">Out for Delivery</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop Orders Table (Tablets & Large screens) */}
+            <div className="hidden md:block bg-white rounded-3xl border border-natural-border shadow-subtle overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+                <table className="w-full text-left text-xs min-w-[700px] whitespace-nowrap">
                   <thead className="bg-natural-surface border-b border-natural-border text-natural-muted uppercase text-[10px] tracking-wider">
                     <tr>
                       <th className="p-4">Order Ref</th>
@@ -2063,8 +2280,8 @@ export default function AdminDashboardPage() {
       {/* MODAL 1: RECORD SEEDING BATCH */}
       {/* ========================================================= */}
       {showAddBatchModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-elevated space-y-5 animate-scale-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-5 sm:p-8 shadow-elevated space-y-4 my-auto max-h-[92vh] overflow-y-auto">
             <div className="border-b border-natural-border pb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sprout className="w-5 h-5 text-brand-700" />
@@ -2074,7 +2291,7 @@ export default function AdminDashboardPage() {
               </div>
               <button
                 onClick={() => setShowAddBatchModal(false)}
-                className="text-natural-muted hover:text-natural-text"
+                className="text-natural-muted hover:text-natural-text p-1 rounded-lg"
               >
                 ✕
               </button>
@@ -2098,7 +2315,7 @@ export default function AdminDashboardPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <Input
                   label="Date Seeded"
                   type="date"
@@ -2117,7 +2334,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <Input
                   label="Trays Planted"
                   type="number"
@@ -2168,8 +2385,8 @@ export default function AdminDashboardPage() {
       {/* MODAL 2: LOG DIRECT OFFLINE SALE */}
       {/* ========================================================= */}
       {showAddSaleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-elevated space-y-5 animate-scale-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-5 sm:p-8 shadow-elevated space-y-4 my-auto max-h-[92vh] overflow-y-auto">
             <div className="border-b border-natural-border pb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Receipt className="w-5 h-5 text-emerald-700" />
@@ -2179,7 +2396,7 @@ export default function AdminDashboardPage() {
               </div>
               <button
                 onClick={() => setShowAddSaleModal(false)}
-                className="text-natural-muted hover:text-natural-text"
+                className="text-natural-muted hover:text-natural-text p-1 rounded-lg"
               >
                 ✕
               </button>
@@ -2214,7 +2431,7 @@ export default function AdminDashboardPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <Input
                   label="Quantity (Packs)"
                   type="number"
@@ -2251,7 +2468,7 @@ export default function AdminDashboardPage() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-1.5">
                   <label className="block text-xs font-semibold text-natural-text uppercase tracking-wider">
                     Sales Channel
@@ -2285,13 +2502,14 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <Input
                   label="Customer Name (Optional)"
                   placeholder="e.g. Ramesh"
                   value={offlineForm.customer_name}
                   onChange={(e) => setOfflineForm({ ...offlineForm, customer_name: e.target.value })}
                 />
+
                 <Input
                   label="Customer Phone (Optional)"
                   placeholder="e.g. 9876543210"
@@ -2317,8 +2535,8 @@ export default function AdminDashboardPage() {
       {/* MODAL 3: ADD NEW MICROGREEN VARIETY */}
       {/* ========================================================= */}
       {showAddProductModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-elevated space-y-5 animate-scale-in max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-5 sm:p-8 shadow-elevated space-y-5 animate-scale-in my-auto max-h-[92vh] overflow-y-auto border border-natural-border">
             <div className="border-b border-natural-border pb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Package className="w-5 h-5 text-brand-700" />
@@ -2328,7 +2546,8 @@ export default function AdminDashboardPage() {
               </div>
               <button
                 onClick={() => setShowAddProductModal(false)}
-                className="text-natural-muted hover:text-natural-text"
+                className="w-8 h-8 rounded-full bg-natural-surface hover:bg-natural-border text-natural-muted hover:text-natural-text flex items-center justify-center transition-colors"
+                title="Close"
               >
                 ✕
               </button>
@@ -2343,7 +2562,7 @@ export default function AdminDashboardPage() {
                 onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
               />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-1.5">
                   <label className="block text-xs font-semibold text-natural-text uppercase tracking-wider">
                     Category Profile
@@ -2378,7 +2597,7 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <Input
                   label="Base Price (50g INR)"
                   type="number"
@@ -3050,8 +3269,8 @@ export default function AdminDashboardPage() {
 
       {/* MODAL 5: ADD ASSET / INVENTORY ITEM */}
       {showAddInventoryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-natural-border shadow-elevated space-y-6 my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-8 border border-natural-border shadow-elevated space-y-5 sm:space-y-6 my-auto max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-natural-border pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
@@ -3145,7 +3364,7 @@ export default function AdminDashboardPage() {
               </div>
 
               {/* Quantity and Unit */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
                     Count / Quantity *
@@ -3179,7 +3398,7 @@ export default function AdminDashboardPage() {
               </div>
 
               {/* Location and Condition */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
                     Physical Location
@@ -3252,8 +3471,8 @@ export default function AdminDashboardPage() {
 
       {/* MODAL 6: EDIT ASSET / INVENTORY ITEM */}
       {editingInventoryItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-natural-border shadow-elevated space-y-6 my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-8 border border-natural-border shadow-elevated space-y-5 sm:space-y-6 my-auto max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-natural-border pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
@@ -3341,7 +3560,7 @@ export default function AdminDashboardPage() {
               </div>
 
               {/* Count and Unit */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
                     Count / Quantity *
@@ -3374,7 +3593,7 @@ export default function AdminDashboardPage() {
               </div>
 
               {/* Location and Condition */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
                     Physical Location
@@ -3447,8 +3666,8 @@ export default function AdminDashboardPage() {
 
       {/* MODAL 7: QUICK ADD CATEGORY MODAL */}
       {showQuickCategoryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 border border-natural-border shadow-elevated space-y-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 border border-natural-border shadow-elevated space-y-5 my-auto max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-natural-border pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center">

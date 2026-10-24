@@ -1,9 +1,18 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Sprout, Phone, Mail, MapPin, ArrowRight } from "lucide-react";
 import { Logo } from "../ui/Logo";
 
 export function Footer() {
+  const pathname = usePathname();
+
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
+
   return (
     <footer className="bg-brand-950 text-natural-warmWhite border-t border-brand-900/50">
       {/* Brand Highlights Strip */}
