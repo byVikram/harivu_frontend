@@ -24,6 +24,7 @@ import {
   updateOfficeInventoryCount,
   adjustOfficeInventoryCount,
   deleteOfficeInventoryItem,
+  uploadAdminImage,
   OfficeInventoryItem,
   OfficeInventoryHistoryEntry,
   OfficeCategoryStat,
@@ -78,6 +79,7 @@ import {
   ArrowDownRight,
   Filter,
   BarChart2,
+  Upload,
 } from "lucide-react";
 
 type AdminTab = "overview" | "seeding" | "products" | "assets" | "offline" | "orders";
@@ -393,6 +395,31 @@ export default function AdminDashboardPage() {
       loadData();
     } else {
       showToast(res.message || "Failed to add product", "error");
+    }
+  };
+
+  // 5.05 Quick Product Image Upload Handler
+  const handleQuickProductImageUpload = async (prod: Product, file: File) => {
+    try {
+      showToast(`Uploading photo for ${prod.name}...`);
+      const res = await uploadAdminImage(file);
+      if (res.success && res.url) {
+        const updateRes = await updateAdminProduct(prod.id, {
+          ...prod,
+          image_url: res.url,
+        });
+        if (updateRes.success) {
+          showToast(`Photo for ${prod.name} updated!`);
+          loadData();
+        } else {
+          showToast(updateRes.message || "Failed to save product image", "error");
+        }
+      } else {
+        showToast(res.message || "Image upload failed", "error");
+      }
+    } catch (err) {
+      console.error("Quick image upload error:", err);
+      showToast("Error uploading product image", "error");
     }
   };
 
@@ -1669,15 +1696,31 @@ export default function AdminDashboardPage() {
 
                     {/* Product Media & Title */}
                     <div className="flex items-start gap-3">
-                      <div className="relative shrink-0">
+                      <div className="relative shrink-0 group/img cursor-pointer">
                         <img
-                          src={prod.image_url}
+                          src={prod.image_url || "/assets/sunflower.png"}
                           alt={prod.name}
-                          className="w-16 h-16 rounded-2xl object-cover border border-natural-border shadow-2xs"
+                          className="w-16 h-16 rounded-2xl object-cover border border-natural-border shadow-2xs group-hover/img:brightness-90 transition-all"
                         />
+                        <label
+                          className="absolute inset-0 bg-black/50 opacity-0 group-hover/img:opacity-100 transition-opacity rounded-2xl flex flex-col items-center justify-center text-white cursor-pointer"
+                          title="Click to upload/change photo"
+                        >
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleQuickProductImageUpload(prod, file);
+                            }}
+                          />
+                          <Upload className="w-4 h-4" />
+                          <span className="text-[9px] font-bold mt-0.5">Upload</span>
+                        </label>
                         {prod.video_url && (
                           <span
-                            className="absolute -bottom-1 -right-1 bg-brand-900 text-brand-100 p-1 rounded-full shadow-xs"
+                            className="absolute -bottom-1 -right-1 bg-brand-900 text-brand-100 p-1 rounded-full shadow-xs pointer-events-none"
                             title="Has video attached"
                           >
                             <Video className="w-3 h-3" />
@@ -2927,11 +2970,11 @@ export default function AdminDashboardPage() {
                 onChange={(e) => setNewProductForm({ ...newProductForm, flavor_profile: e.target.value })}
               />
 
-              <Input
-                label="Image URL"
-                required
+              <ImageUpload
+                label="Variety Photo *"
                 value={newProductForm.image_url}
-                onChange={(e) => setNewProductForm({ ...newProductForm, image_url: e.target.value })}
+                onChange={(url) => setNewProductForm({ ...newProductForm, image_url: url })}
+                helperText="Upload a photo from your device or provide an image URL. Displayed in customer catalogue."
               />
 
               <Textarea
@@ -3307,27 +3350,34 @@ export default function AdminDashboardPage() {
                   <span>3. Media, Images & Video Presentation</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input
-                    label="Image Asset URL / Path"
-                    required
-                    placeholder="/assets/sunflower.png or https://..."
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+                  <ImageUpload
+                    label="Variety Photo *"
                     value={editProductForm.image_url}
-                    onChange={(e) =>
-                      setEditProductForm({ ...editProductForm, image_url: e.target.value })
-                    }
-                    helperText="Local asset (e.g. /assets/sunflower.png) or web URL"
+                    onChange={(url) => setEditProductForm({ ...editProductForm, image_url: url })}
+                    helperText="Upload a photo from your device or paste a URL."
                   />
 
-                  <Input
-                    label="Video Asset URL / Path"
-                    placeholder="/assets/sunflower_intro.mp4 or https://..."
-                    value={editProductForm.video_url}
-                    onChange={(e) =>
-                      setEditProductForm({ ...editProductForm, video_url: e.target.value })
-                    }
-                    helperText="Local video (e.g. /assets/sunflower_intro.mp4) or MP4 link"
-                  />
+                  <div className="space-y-3">
+                    <Input
+                      label="Video Asset URL / Path (Optional)"
+                      placeholder="/assets/sunflower_intro.mp4 or https://..."
+                      value={editProductForm.video_url}
+                      onChange={(e) =>
+                        setEditProductForm({ ...editProductForm, video_url: e.target.value })
+                      }
+                      helperText="Local video (e.g. /assets/sunflower_intro.mp4) or MP4 link"
+                    />
+
+                    {editProductForm.image_url && (
+                      <div className="text-xs text-natural-muted font-mono break-all bg-natural-surface p-2.5 rounded-xl border border-natural-border">
+                        <span className="font-bold text-natural-text block text-[10px] uppercase font-sans mb-0.5">
+                          Active Image URL / Path:
+                        </span>
+                        {editProductForm.image_url}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
