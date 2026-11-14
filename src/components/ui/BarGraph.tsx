@@ -175,15 +175,39 @@ export function BarGraph({
 
         <div className="font-mono text-xs">
           {activeMode === "timeline" ? (
-            <>
-              <span className="text-natural-muted">Latest Stock: </span>
-              <strong className="text-brand-950 text-sm font-extrabold">
-                {latestItem?.currentValue ?? 0} {latestItem?.unit || "units"}
-              </strong>
-              <span className="text-natural-muted text-[11px] ml-1.5">
-                ({displayData.length} records)
-              </span>
-            </>
+            hoveredItem ? (
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-natural-muted font-sans">Inspecting:</span>
+                <span className="font-bold text-natural-text font-sans">{hoveredItem.label}</span>
+                <span className="text-natural-muted font-sans">➔</span>
+                <strong className="text-emerald-700 text-sm font-extrabold">
+                  {hoveredItem.currentValue} {hoveredItem.unit || "units"}
+                </strong>
+                {hoveredItem.previousValue !== undefined && (
+                  <span
+                    className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${
+                      hoveredItem.currentValue - hoveredItem.previousValue >= 0
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                        : "bg-rose-100 text-rose-800 border border-rose-200"
+                    }`}
+                  >
+                    {hoveredItem.currentValue - hoveredItem.previousValue >= 0
+                      ? `+${hoveredItem.currentValue - hoveredItem.previousValue}`
+                      : hoveredItem.currentValue - hoveredItem.previousValue}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <>
+                <span className="text-natural-muted">Latest Stock: </span>
+                <strong className="text-brand-950 text-sm font-extrabold">
+                  {latestItem?.currentValue ?? 0} {latestItem?.unit || "units"}
+                </strong>
+                <span className="text-natural-muted text-[11px] ml-1.5">
+                  ({displayData.length} records)
+                </span>
+              </>
+            )
           ) : (
             <>
               <span className="text-natural-muted">Total Stock in Chart: </span>
@@ -194,7 +218,7 @@ export function BarGraph({
       </div>
 
       {/* Bar Chart Visualization Canvas */}
-      <div className="relative pt-6 pb-2 overflow-x-auto">
+      <div className="relative pt-28 pb-2 overflow-x-auto">
         {displayData.length === 0 ? (
           <div className="text-center py-12 text-xs text-natural-muted">No data available to plot graph.</div>
         ) : (
@@ -213,7 +237,7 @@ export function BarGraph({
               ))}
 
               {/* Individual Bar Columns */}
-              {displayData.map((item) => {
+              {displayData.map((item, itemIdx) => {
                 const currentHeightPct = Math.min(100, Math.max(6, (item.currentValue / chartCeiling) * 100));
                 const prevHeightPct =
                   item.previousValue !== undefined
@@ -221,7 +245,10 @@ export function BarGraph({
                     : 0;
 
                 const diff = item.previousValue !== undefined ? item.currentValue - item.previousValue : 0;
+                const isPositive = diff >= 0;
                 const isHovered = hoveredItem?.id === item.id;
+                const isFirst = itemIdx === 0;
+                const isLast = itemIdx === displayData.length - 1;
 
                 return (
                   <div
@@ -232,23 +259,55 @@ export function BarGraph({
                   >
                     {/* Floating Value Tooltip on Hover */}
                     {isHovered && (
-                      <div className="absolute -top-14 z-20 bg-brand-950 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl shadow-elevated whitespace-nowrap animate-scale-in text-center pointer-events-none">
-                        <div className="text-emerald-300 font-extrabold text-xs">
-                          {item.currentValue} {item.unit || "units"}
-                        </div>
-                        <div className="text-natural-light/80 text-[10px] font-normal">
+                      <div
+                        className={`absolute bottom-[calc(100%+12px)] z-30 bg-slate-900 text-white rounded-2xl p-3 shadow-2xl border border-slate-700/80 pointer-events-none whitespace-normal min-w-[180px] max-w-[260px] animate-scale-in text-center ${
+                          isFirst ? "left-0" : isLast ? "right-0" : "left-1/2 -translate-x-1/2"
+                        }`}
+                      >
+                        {/* Timestamp / Date */}
+                        <div className="text-[11px] font-semibold text-slate-300">
                           {item.label}
                         </div>
+
+                        {/* Big Stock Value */}
+                        <div className="text-base font-extrabold text-emerald-400 font-mono tracking-tight mt-0.5">
+                          {item.currentValue}{" "}
+                          <span className="text-xs font-semibold text-emerald-300 font-sans">
+                            {item.unit || "units"}
+                          </span>
+                        </div>
+
+                        {/* Change badge */}
                         {item.previousValue !== undefined && diff !== 0 && (
-                          <div className="text-indigo-200 text-[10px] font-normal mt-0.5">
-                            {diff >= 0 ? `+${diff}` : diff} from previous ({item.previousValue})
+                          <div className="mt-1 flex items-center justify-center gap-1.5 text-[11px]">
+                            <span
+                              className={`inline-flex items-center text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${
+                                isPositive
+                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                  : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                              }`}
+                            >
+                              {isPositive ? `+${diff}` : diff}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              from {item.previousValue}
+                            </span>
                           </div>
                         )}
+
+                        {/* Note */}
                         {item.notes && (
-                          <div className="text-[9px] text-amber-200/90 font-normal italic mt-0.5 max-w-[180px] truncate">
+                          <p className="text-[11px] text-amber-200 bg-amber-950/40 border border-amber-500/20 rounded-lg px-2.5 py-1.5 mt-2 leading-snug text-left font-normal">
                             {item.notes}
-                          </div>
+                          </p>
                         )}
+
+                        {/* Pointer Arrow pointing to candle */}
+                        <div
+                          className={`absolute top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900 ${
+                            isFirst ? "left-4" : isLast ? "right-4" : "left-1/2 -translate-x-1/2"
+                          }`}
+                        />
                       </div>
                     )}
 
