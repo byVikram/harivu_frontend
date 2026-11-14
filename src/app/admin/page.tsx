@@ -4296,9 +4296,10 @@ export default function AdminDashboardPage() {
 
             {/* Item Stock History Bar Graph */}
             <BarGraph
-              title="Stock Level Progression"
-              subtitle={`Chronological count comparison for ${selectedItemForHistory.name}`}
-              mode="comparison"
+              title="Stock Movement History"
+              subtitle={`Chronological stock levels for ${selectedItemForHistory.name}`}
+              mode="timeline"
+              hideModeToggle={true}
               data={
                 itemHistoryList.length > 0
                   ? [...itemHistoryList].reverse().map((entry, idx) => ({
