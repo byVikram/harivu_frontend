@@ -93,6 +93,30 @@ export function ProductCard({ product }: ProductCardProps) {
           )}
         </div>
 
+        {/* Live Stock Count Badge */}
+        <div className="absolute top-3 right-3 pointer-events-none">
+          <span
+            className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full backdrop-blur-md shadow-xs ${
+              (product.stock_quantity ?? 50) > 10
+                ? "bg-emerald-950/85 text-emerald-200 border border-emerald-400/40"
+                : (product.stock_quantity ?? 50) > 0
+                ? "bg-amber-950/85 text-amber-200 border border-amber-400/40"
+                : "bg-red-950/85 text-red-200 border border-red-400/40"
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                (product.stock_quantity ?? 50) > 10
+                  ? "bg-emerald-400"
+                  : (product.stock_quantity ?? 50) > 0
+                  ? "bg-amber-400"
+                  : "bg-red-400"
+              }`}
+            />
+            <span>{product.stock_quantity ?? 50} in stock</span>
+          </span>
+        </div>
+
         <div className="absolute bottom-3 left-3 pointer-events-none">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-black/60 text-white backdrop-blur-md px-2.5 py-1 rounded-full">
             <Clock className="w-3 h-3 text-brand-300" />
@@ -152,9 +176,14 @@ export function ProductCard({ product }: ProductCardProps) {
         {/* Price & Action Row */}
         <div className="pt-3 border-t border-natural-border/70 flex items-center justify-between gap-3">
           <div>
-            <span className="text-[10px] uppercase font-bold text-natural-muted block">
-              {selectedVariant.weight_grams || 50}g Pack
-            </span>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className="text-[10px] uppercase font-bold text-natural-muted block">
+                {selectedVariant.weight_grams || 50}g Pack
+              </span>
+              <span className="text-[10px] text-emerald-800 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                {product.stock_quantity ?? 50} available
+              </span>
+            </div>
             <span className="font-serif text-xl font-extrabold text-brand-950">
               {formatCurrency(selectedVariant.price)}
             </span>

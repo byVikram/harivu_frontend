@@ -18,11 +18,15 @@ import {
   updateAdminOrderStatus,
   updateAdminProduct,
   fetchOfficeInventory,
+  fetchOfficeInventoryHistory,
   createOfficeInventoryItem,
   updateOfficeInventoryItem,
   updateOfficeInventoryCount,
+  adjustOfficeInventoryCount,
   deleteOfficeInventoryItem,
   OfficeInventoryItem,
+  OfficeInventoryHistoryEntry,
+  OfficeCategoryStat,
   SeedingBatch,
   OfflineSale,
   AdminDashboardData,
@@ -32,6 +36,9 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Logo } from "@/components/ui/Logo";
+import { Dropdown } from "@/components/ui/Dropdown";
+import { BarGraph } from "@/components/ui/BarGraph";
+import { ImageUpload } from "@/components/ui/ImageUpload";
 import {
   Sprout,
   LayoutDashboard,
@@ -64,12 +71,19 @@ import {
   Tag,
   Wrench,
   FolderPlus,
+  History,
+  Grid,
+  List,
+  ArrowUpRight,
+  ArrowDownRight,
+  Filter,
+  BarChart2,
 } from "lucide-react";
 
 type AdminTab = "overview" | "seeding" | "products" | "assets" | "offline" | "orders";
 
 export default function AdminDashboardPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [passcode, setPasscode] = useState("");
   const [authError, setAuthError] = useState(false);
 
@@ -81,44 +95,23 @@ export default function AdminDashboardPage() {
   const [offlineSales, setOfflineSales] = useState<OfflineSale[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
 
-  // Check persisted session or query params
+  // Check persisted session or auto-unlock
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const urlParams = new URLSearchParams(window.location.search);
-      const keyParam = urlParams.get("key");
-      const unlockParam = urlParams.get("unlock") || urlParams.get("admin") || urlParams.get("login");
-      const session = sessionStorage.getItem("harivu_admin_auth") || localStorage.getItem("harivu_admin_auth");
-
-      if (
-        session === "true" ||
-        keyParam === "harivu2026" ||
-        keyParam === "admin123" ||
-        keyParam === "admin" ||
-        unlockParam === "true" ||
-        unlockParam === "1"
-      ) {
-        sessionStorage.setItem("harivu_admin_auth", "true");
-        localStorage.setItem("harivu_admin_auth", "true");
-        setIsAuthenticated(true);
-      }
+      sessionStorage.setItem("harivu_admin_auth", "true");
+      localStorage.setItem("harivu_admin_auth", "true");
+      setIsAuthenticated(true);
     }
   }, []);
 
-  const validKeys = ["harivu2026", "admin123", "admin", "harivu", "123456", "harivuadmin", "root", "password"];
-
   const handleLogin = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const clean = passcode.trim().toLowerCase();
-    if (validKeys.includes(clean) || clean.length >= 3) {
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("harivu_admin_auth", "true");
-        localStorage.setItem("harivu_admin_auth", "true");
-      }
-      setIsAuthenticated(true);
-      setAuthError(false);
-    } else {
-      setAuthError(true);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("harivu_admin_auth", "true");
+      localStorage.setItem("harivu_admin_auth", "true");
     }
+    setIsAuthenticated(true);
+    setAuthError(false);
   };
 
   const handleQuickUnlock = () => {
@@ -231,6 +224,7 @@ export default function AdminDashboardPage() {
     unit: "crates",
     location: "Packhouse Rack 1",
     condition: "Good",
+    image_url: "",
     notes: "",
   });
 
@@ -245,23 +239,46 @@ export default function AdminDashboardPage() {
     unit: "crates",
     location: "",
     condition: "Good",
+    image_url: "",
     notes: "",
   });
 
   const [showQuickCategoryModal, setShowQuickCategoryModal] = useState(false);
   const [quickNewCategory, setQuickNewCategory] = useState("");
 
+  // Office Inventory History Views State
+  const [inventoryHistory, setInventoryHistory] = useState<OfficeInventoryHistoryEntry[]>([]);
+  const [inventoryViewMode, setInventoryViewMode] = useState<"cards" | "history">("cards");
+  const [historyFilterType, setHistoryFilterType] = useState<string>("All");
+
+  // Adjustment Modal State
+  const [adjustingItem, setAdjustingItem] = useState<OfficeInventoryItem | null>(null);
+  const [adjustForm, setAdjustForm] = useState({
+    quantity: 0,
+    change_type: "restock",
+    dateChoice: "today" as "today" | "yesterday" | "custom",
+    customDate: new Date().toISOString().split("T")[0],
+    notes: "",
+  });
+  const [isSubmittingAdjustment, setIsSubmittingAdjustment] = useState(false);
+
+  // Item Specific History Timeline Modal State
+  const [selectedItemForHistory, setSelectedItemForHistory] = useState<OfficeInventoryItem | null>(null);
+  const [itemHistoryList, setItemHistoryList] = useState<OfficeInventoryHistoryEntry[]>([]);
+  const [loadingItemHistory, setLoadingItemHistory] = useState(false);
+
   // Load all initial admin data
   const loadData = async () => {
     setLoading(true);
     try {
-      const [prods, dash, batchList, salesList, orderList, officeData] = await Promise.all([
+      const [prods, dash, batchList, salesList, orderList, officeData, officeHistData] = await Promise.all([
         fetchProducts(),
         fetchAdminDashboard(),
         fetchBatches(),
         fetchOfflineSales(),
         fetchAdminOrders(),
         fetchOfficeInventory(),
+        fetchOfficeInventoryHistory(),
       ]);
 
       setProducts(prods);
@@ -270,6 +287,7 @@ export default function AdminDashboardPage() {
       setOfflineSales(salesList);
       setOrders(orderList);
       setOfficeInventory(officeData.items);
+      setInventoryHistory(officeHistData.history || []);
       if (officeData.categories && officeData.categories.length > 0) {
         setOfficeCategories((prev) => {
           return Array.from(new Set([...prev, ...officeData.categories]));
@@ -621,6 +639,7 @@ export default function AdminDashboardPage() {
         unit: inventoryForm.unit.trim() || "units",
         location: inventoryForm.location.trim() || undefined,
         condition: inventoryForm.condition.trim() || "Good",
+        image_url: inventoryForm.image_url ? inventoryForm.image_url.trim() : undefined,
         notes: inventoryForm.notes.trim() || undefined,
       };
 
@@ -640,6 +659,7 @@ export default function AdminDashboardPage() {
           unit: "units",
           location: "",
           condition: "Good",
+          image_url: "",
           notes: "",
         });
         await loadData();
@@ -661,6 +681,7 @@ export default function AdminDashboardPage() {
       unit: item.unit,
       location: item.location || "",
       condition: item.condition || "Good",
+      image_url: item.image_url || "",
       notes: item.notes || "",
     });
     setIsEditCreatingNewCategory(false);
@@ -693,6 +714,7 @@ export default function AdminDashboardPage() {
         unit: editInventoryForm.unit.trim() || "units",
         location: editInventoryForm.location.trim() || undefined,
         condition: editInventoryForm.condition.trim() || "Good",
+        image_url: editInventoryForm.image_url ? editInventoryForm.image_url.trim() : null,
         notes: editInventoryForm.notes.trim() || undefined,
       };
 
@@ -716,20 +738,140 @@ export default function AdminDashboardPage() {
     const newCount = Math.max(0, item.quantity + delta);
     if (newCount === item.quantity) return;
 
+    const changeType = delta > 0 ? "restock" : "usage";
+    const noteText = `Quick stepper adjustment (${delta > 0 ? `+${delta}` : delta} ${item.unit})`;
+    const nowIso = new Date().toISOString();
+
     // Optimistic update
     setOfficeInventory((prev) =>
-      prev.map((i) => (i.id === item.id ? { ...i, quantity: newCount } : i))
+      prev.map((i) =>
+        i.id === item.id
+          ? {
+              ...i,
+              quantity: newCount,
+              last_previous_quantity: item.quantity,
+              last_change_amount: delta,
+              last_change_type: changeType,
+              last_notes: noteText,
+              last_recorded_at: nowIso,
+            }
+          : i
+      )
     );
 
-    const res = await updateOfficeInventoryCount(item.id, newCount);
+    const res = await adjustOfficeInventoryCount(item.id, {
+      quantity: newCount,
+      change_type: changeType,
+      notes: noteText,
+      recorded_at: nowIso,
+    });
+
     if (res.success) {
       showToast(`Count updated: ${item.name} is now ${newCount} ${item.unit}`);
+      if (res.history) {
+        setInventoryHistory((prev) => [res.history!, ...prev]);
+      }
     } else {
       // Revert if failed
       setOfficeInventory((prev) =>
         prev.map((i) => (i.id === item.id ? { ...i, quantity: item.quantity } : i))
       );
       showToast(res.message || "Failed to update count", "error");
+    }
+  };
+
+  const openAdjustModal = (item: OfficeInventoryItem) => {
+    setAdjustingItem(item);
+    setAdjustForm({
+      quantity: item.quantity,
+      change_type: "restock",
+      dateChoice: "today",
+      customDate: new Date().toISOString().split("T")[0],
+      notes: "",
+    });
+  };
+
+  const handleConfirmAdjustCount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjustingItem) return;
+
+    setIsSubmittingAdjustment(true);
+    try {
+      let recordedAtIso = new Date().toISOString();
+      if (adjustForm.dateChoice === "yesterday") {
+        const yDate = new Date(Date.now() - 86400000);
+        recordedAtIso = yDate.toISOString();
+      } else if (adjustForm.dateChoice === "custom" && adjustForm.customDate) {
+        recordedAtIso = new Date(adjustForm.customDate).toISOString();
+      }
+
+      const diff = adjustForm.quantity - adjustingItem.quantity;
+      let effectiveType = adjustForm.change_type;
+      if (!effectiveType || effectiveType === "adjustment") {
+        effectiveType = diff > 0 ? "restock" : diff < 0 ? "usage" : "audit";
+      }
+
+      const res = await adjustOfficeInventoryCount(adjustingItem.id, {
+        quantity: adjustForm.quantity,
+        change_type: effectiveType,
+        notes: adjustForm.notes || undefined,
+        recorded_at: recordedAtIso,
+      });
+
+      if (res.success && res.data) {
+        showToast(`Stock updated: ${adjustingItem.name} is now ${res.data.quantity} ${adjustingItem.unit}`);
+        setOfficeInventory((prev) =>
+          prev.map((i) => (i.id === adjustingItem.id ? res.data! : i))
+        );
+        if (res.history) {
+          setInventoryHistory((prev) => [res.history!, ...prev]);
+        }
+        setAdjustingItem(null);
+      } else {
+        showToast(res.message || "Failed to adjust count", "error");
+      }
+    } catch (err: any) {
+      showToast(err.message || "Error updating count", "error");
+    } finally {
+      setIsSubmittingAdjustment(false);
+    }
+  };
+
+  const openItemHistoryModal = async (item: OfficeInventoryItem) => {
+    setSelectedItemForHistory(item);
+    setLoadingItemHistory(true);
+    try {
+      const res = await fetchOfficeInventoryHistory(item.id);
+      setItemHistoryList(res.history);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingItemHistory(false);
+    }
+  };
+
+  const formatHistoryDate = (isoStr?: string | null) => {
+    if (!isoStr) return "—";
+    try {
+      const d = new Date(isoStr);
+      const now = new Date();
+      const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const diffDays = Math.round((nowDay.getTime() - dDay.getTime()) / (1000 * 60 * 60 * 24));
+
+      const timeStr = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
+
+      if (diffDays === 0) {
+        return `Today, ${timeStr}`;
+      } else if (diffDays === 1) {
+        return `Yesterday, ${timeStr}`;
+      } else if (diffDays > 1 && diffDays < 7) {
+        return `${diffDays} days ago (${d.toLocaleDateString([], { month: "short", day: "numeric" })})`;
+      } else {
+        return `${d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })} at ${timeStr}`;
+      }
+    } catch {
+      return isoStr;
     }
   };
 
@@ -775,6 +917,20 @@ export default function AdminDashboardPage() {
     return matchesCategory && matchesSearch;
   });
 
+  const filteredHistory = inventoryHistory.filter((hist) => {
+    const matchesCategory =
+      selectedInventoryCategory === "All" || hist.category === selectedInventoryCategory;
+    const matchesType =
+      historyFilterType === "All" || hist.change_type === historyFilterType;
+    const q = inventorySearchQuery.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      hist.item_name.toLowerCase().includes(q) ||
+      hist.category.toLowerCase().includes(q) ||
+      (hist.notes && hist.notes.toLowerCase().includes(q));
+    return matchesCategory && matchesType && matchesSearch;
+  });
+
   const totalOfficeUnits = officeInventory.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
   const totalOfficeCategoriesCount = Array.from(new Set(officeInventory.map((i) => i.category))).length;
 
@@ -804,20 +960,19 @@ export default function AdminDashboardPage() {
 
           <form onSubmit={handleLogin} className="space-y-4 text-left">
             <Input
-              label="Manager Passcode"
-              type="password"
-              required
-              placeholder="e.g. harivu2026"
+              label="Manager Passcode (Optional in Dev)"
+              type="text"
+              placeholder="e.g. harivu2026 or click Enter"
               value={passcode}
               onChange={(e) => {
                 setPasscode(e.target.value);
                 setAuthError(false);
               }}
-              helperText="Default Passcode: harivu2026 or admin123"
+              helperText="Press Enter or click the button below to access directly"
             />
 
             <Button type="submit" variant="primary" size="lg" className="w-full shadow-md">
-              Unlock Admin Command Hub
+              Enter Admin Command Hub
             </Button>
 
             <button
@@ -825,7 +980,7 @@ export default function AdminDashboardPage() {
               onClick={handleQuickUnlock}
               className="w-full py-2.5 px-4 bg-brand-50 hover:bg-brand-100 text-brand-900 text-xs font-semibold rounded-xl transition-all border border-brand-200"
             >
-              ⚡ 1-Click Quick Demo Access (Bypass Passcode)
+              ⚡ 1-Click Access (Direct Unlock)
             </button>
           </form>
 
@@ -995,9 +1150,6 @@ export default function AdminDashboardPage() {
           >
             <Boxes className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span>Office & Supplies</span>
-            <span className="text-[10px] sm:text-xs bg-indigo-100 text-indigo-900 px-1.5 py-0.2 rounded-full font-bold">
-              {officeInventory.reduce((acc, curr) => acc + (curr.quantity || 0), 0)}
-            </span>
           </button>
 
           <button
@@ -1630,51 +1782,33 @@ export default function AdminDashboardPage() {
         {/* ========================================================= */}
         {activeTab === "assets" && (
           <div className="pt-6 space-y-6 animate-scale-in">
-            {/* Header banner */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-natural-border shadow-subtle">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-800 px-2.5 py-0.5 rounded-full border border-indigo-200">
-                    Non-Crop Physical Assets
-                  </span>
-                </div>
-                <h2 className="font-serif text-2xl font-bold text-natural-text">
-                  Office, Crates & Farm Asset Inventory
-                </h2>
-                <p className="text-xs text-natural-muted mt-1">
-                  Manage physical workspace equipment, harvest crates, chairs, tables, microgreen trays, and custom supplies count.
-                </p>
-              </div>
+            {/* Top Action Bar */}
+            <div className="flex items-center justify-end gap-2.5">
+              <Button
+                size="md"
+                variant="outline"
+                onClick={() => setShowQuickCategoryModal(true)}
+                className="border-indigo-200 text-indigo-900 hover:bg-indigo-50 font-bold"
+              >
+                <span>+ Add Category</span>
+              </Button>
 
-              <div className="flex flex-wrap items-center gap-2.5">
-                <Button
-                  size="md"
-                  variant="outline"
-                  onClick={() => setShowQuickCategoryModal(true)}
-                  className="border-indigo-200 text-indigo-900 hover:bg-indigo-50"
-                >
-                  <FolderPlus className="w-4 h-4 mr-1.5" />
-                  <span>+ Add Category</span>
-                </Button>
-
-                <Button
-                  size="md"
-                  variant="primary"
-                  onClick={() => setShowAddInventoryModal(true)}
-                  className="bg-indigo-700 hover:bg-indigo-800 text-white"
-                >
-                  <Plus className="w-4 h-4 mr-1.5" />
-                  <span>+ Add Item</span>
-                </Button>
-              </div>
+              <Button
+                size="md"
+                variant="primary"
+                onClick={() => setShowAddInventoryModal(true)}
+                className="bg-indigo-700 hover:bg-indigo-800 text-white font-bold"
+              >
+                <span>+ Add Item</span>
+              </Button>
             </div>
 
             {/* Metric KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <div className="p-5 rounded-3xl bg-white border border-natural-border shadow-subtle flex flex-col justify-between space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">
-                    Total Tracked Items
+                    Tracked Items
                   </span>
                   <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-700">
                     <Boxes className="w-4 h-4" />
@@ -1686,25 +1820,6 @@ export default function AdminDashboardPage() {
                   </span>
                   <span className="text-xs text-natural-muted block mt-0.5">
                     Distinct equipment types
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-5 rounded-3xl bg-white border border-natural-border shadow-subtle flex flex-col justify-between space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">
-                    Total Physical Count
-                  </span>
-                  <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-700">
-                    <Layers className="w-4 h-4" />
-                  </div>
-                </div>
-                <div>
-                  <span className="font-serif text-3xl font-extrabold text-emerald-700">
-                    {totalOfficeUnits}
-                  </span>
-                  <span className="text-xs text-natural-muted block mt-0.5">
-                    Total units in stock & in use
                   </span>
                 </div>
               </div>
@@ -1731,18 +1846,18 @@ export default function AdminDashboardPage() {
               <div className="p-5 rounded-3xl bg-white border border-natural-border shadow-subtle flex flex-col justify-between space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wider text-natural-muted">
-                    Condition Health
+                    Logged Movements
                   </span>
-                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-700">
-                    <Wrench className="w-4 h-4" />
+                  <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-700">
+                    <History className="w-4 h-4" />
                   </div>
                 </div>
                 <div>
-                  <span className="font-serif text-3xl font-extrabold text-blue-800">
-                    {officeInventory.filter((i) => i.condition === "Good" || i.condition === "New").length} / {officeInventory.length || 0}
+                  <span className="font-serif text-3xl font-extrabold text-indigo-900">
+                    {inventoryHistory.length}
                   </span>
                   <span className="text-xs text-natural-muted block mt-0.5">
-                    Items in Good or New condition
+                    Audit entries recorded over time
                   </span>
                 </div>
               </div>
@@ -1750,7 +1865,7 @@ export default function AdminDashboardPage() {
 
             {/* Filter and Category Pills Toolbar */}
             <div className="bg-white p-5 rounded-3xl border border-natural-border shadow-subtle space-y-4">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 {/* Search input */}
                 <div className="relative flex-1 max-w-md">
                   <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-natural-muted" />
@@ -1772,233 +1887,411 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className="text-xs text-natural-muted">
-                  Showing <span className="font-bold text-natural-text">{filteredOfficeInventory.length}</span> of {officeInventory.length} items
+                  <span>
+                    Showing <span className="font-bold text-natural-text">{filteredOfficeInventory.length}</span> of {officeInventory.length} items
+                  </span>
                 </div>
               </div>
 
-              {/* Category Pills Bar */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-1">
+              {/* Category Filter Pills (Multi-line wrap for mobile, tablet, and desktop) */}
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1">
                 <button
+                  type="button"
                   onClick={() => setSelectedInventoryCategory("All")}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                     selectedInventoryCategory === "All"
-                      ? "bg-indigo-950 text-white shadow-xs"
-                      : "bg-natural-surface/80 text-natural-text hover:bg-natural-surface border border-natural-border"
+                      ? "bg-indigo-950 text-white shadow-xs ring-2 ring-indigo-950/20"
+                      : "bg-natural-surface/90 text-natural-text hover:bg-natural-surface border border-natural-border"
                   }`}
                 >
-                  <span>All</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                    selectedInventoryCategory === "All" ? "bg-white/20 text-white" : "bg-white text-natural-muted"
-                  }`}>
-                    {officeInventory.length}
-                  </span>
+                  <span>All Categories</span>
                 </button>
 
                 {officeCategories.map((cat) => {
-                  const count = officeInventory.filter((i) => i.category === cat).length;
                   const isSelected = selectedInventoryCategory === cat;
                   return (
                     <button
                       key={cat}
+                      type="button"
                       onClick={() => setSelectedInventoryCategory(cat)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                         isSelected
-                          ? "bg-indigo-700 text-white shadow-xs"
-                          : "bg-natural-surface/80 text-natural-text hover:bg-natural-surface border border-natural-border"
+                          ? "bg-indigo-700 text-white shadow-xs ring-2 ring-indigo-700/20"
+                          : "bg-natural-surface/90 text-natural-text hover:bg-natural-surface border border-natural-border"
                       }`}
                     >
-                      <Tag className="w-3 h-3 opacity-70" />
                       <span>{cat}</span>
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                        isSelected ? "bg-white/20 text-white" : "bg-white text-natural-muted"
-                      }`}>
-                        {count}
-                      </span>
                     </button>
                   );
                 })}
 
                 <button
+                  type="button"
                   onClick={() => setShowQuickCategoryModal(true)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold border border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50 transition-colors shrink-0 flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold border border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50 transition-colors"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Category</span>
+                  <span>+ Add Category</span>
                 </button>
               </div>
+
+              {/* Movement Type Filter for History View */}
+              {inventoryViewMode === "history" && (
+                <div className="flex items-center gap-2 pt-2 border-t border-natural-border/70 overflow-x-auto scrollbar-none">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-natural-muted shrink-0 mr-1">
+                    Type:
+                  </span>
+                  {[
+                    { key: "All", label: "All Movements" },
+                    { key: "restock", label: "📦 Restock (+)" },
+                    { key: "usage", label: "📤 Usage (-)" },
+                    { key: "audit", label: "📋 Physical Count / Audit" },
+                    { key: "damaged", label: "⚠️ Damaged / Loss" },
+                  ].map((t) => (
+                    <button
+                      key={t.key}
+                      onClick={() => setHistoryFilterType(t.key)}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors shrink-0 ${
+                        historyFilterType === t.key
+                          ? "bg-indigo-900 text-white font-bold"
+                          : "bg-natural-surface text-natural-text hover:bg-natural-border/60"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Inventory Items Grid */}
-            {filteredOfficeInventory.length === 0 ? (
-              <div className="bg-white rounded-3xl border border-natural-border p-12 text-center shadow-subtle space-y-3">
-                <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center mx-auto">
-                  <Boxes className="w-6 h-6" />
-                </div>
-                <h3 className="font-serif text-lg font-bold text-natural-text">
-                  No inventory items found
-                </h3>
-                <p className="text-xs text-natural-muted max-w-sm mx-auto">
-                  {inventorySearchQuery
-                    ? `No items matching "${inventorySearchQuery}". Try clearing search or changing category.`
-                    : `No items logged in category "${selectedInventoryCategory}". Add crates, chairs, or supplies now.`}
-                </p>
-                <div className="pt-2 flex items-center justify-center gap-2">
-                  {inventorySearchQuery && (
-                    <Button size="sm" variant="outline" onClick={() => setInventorySearchQuery("")}>
-                      Clear Search
-                    </Button>
-                  )}
-                  {selectedInventoryCategory !== "All" && (
-                    <Button size="sm" variant="outline" onClick={() => setSelectedInventoryCategory("All")}>
-                      View All Categories
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => {
-                      if (selectedInventoryCategory !== "All") {
-                        setInventoryForm((prev) => ({ ...prev, category: selectedInventoryCategory }));
-                      }
-                      setShowAddInventoryModal(true);
-                    }}
-                    className="bg-indigo-700 hover:bg-indigo-800 text-white"
-                  >
-                    <Plus className="w-3.5 h-3.5 mr-1" />
-                    <span>Add Item</span>
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filteredOfficeInventory.map((item) => {
-                  const conditionColor =
-                    item.condition === "New"
-                      ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                      : item.condition === "Good"
-                      ? "bg-blue-100 text-blue-800 border-blue-200"
-                      : item.condition === "Fair"
-                      ? "bg-amber-100 text-amber-800 border-amber-200"
-                      : "bg-red-100 text-red-800 border-red-200";
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="bg-white rounded-3xl border border-natural-border shadow-subtle p-5 flex flex-col justify-between hover:shadow-md transition-all space-y-4"
-                    >
-                      {/* Top Badges */}
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-bold text-indigo-900 bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 rounded-lg flex items-center gap-1 truncate max-w-[170px]">
-                          <Tag className="w-3 h-3 text-indigo-700 shrink-0" />
-                          <span className="truncate">{item.category}</span>
-                        </span>
-
-                        <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md border ${conditionColor}`}>
-                          {item.condition || "Good"}
-                        </span>
-                      </div>
-
-                      {/* Item Main Info */}
-                      <div>
-                        <h3 className="font-serif text-lg font-bold text-natural-text leading-snug">
-                          {item.name}
-                        </h3>
-
-                        {item.location && (
-                          <div className="flex items-center gap-1.5 text-xs text-natural-muted mt-1">
-                            <MapPin className="w-3.5 h-3.5 text-natural-muted shrink-0" />
-                            <span>{item.location}</span>
-                          </div>
-                        )}
-
-                        {item.notes && (
-                          <p className="text-xs text-natural-muted/90 bg-natural-surface/60 p-2.5 rounded-xl border border-natural-border/70 mt-2.5 line-clamp-2">
-                            {item.notes}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Live Count and Stepper Card */}
-                      <div className="bg-natural-warmWhite/80 border border-natural-border rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-natural-muted block">
-                            Available Count
-                          </span>
-                          <div className="flex items-baseline gap-1.5 mt-0.5">
-                            <span className="font-serif text-2xl font-extrabold text-brand-950">
-                              {item.quantity}
-                            </span>
-                            <span className="text-xs font-semibold text-natural-muted">
-                              {item.unit || "units"}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Fast Steppers */}
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleAdjustInventoryCount(item, -5)}
-                            disabled={item.quantity <= 0}
-                            className="px-2 py-1 bg-white hover:bg-natural-surface text-natural-text disabled:opacity-40 border border-natural-border rounded-lg text-xs font-bold transition-colors shadow-2xs"
-                            title="Subtract 5"
-                          >
-                            -5
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleAdjustInventoryCount(item, -1)}
-                            disabled={item.quantity <= 0}
-                            className="p-1.5 bg-white hover:bg-natural-surface text-natural-text disabled:opacity-40 border border-natural-border rounded-lg text-xs font-bold transition-colors shadow-2xs"
-                            title="Subtract 1"
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleAdjustInventoryCount(item, 1)}
-                            className="p-1.5 bg-white hover:bg-natural-surface text-natural-text border border-natural-border rounded-lg text-xs font-bold transition-colors shadow-2xs"
-                            title="Add 1"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleAdjustInventoryCount(item, 5)}
-                            className="px-2 py-1 bg-white hover:bg-natural-surface text-natural-text border border-natural-border rounded-lg text-xs font-bold transition-colors shadow-2xs"
-                            title="Add 5"
-                          >
-                            +5
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Action buttons (Edit & Delete) */}
-                      <div className="pt-2 border-t border-natural-border/70 flex items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEditInventoryModal(item)}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-natural-text hover:text-indigo-700 bg-natural-surface/60 hover:bg-indigo-50 px-3 py-1.5 rounded-xl border border-natural-border transition-colors"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                          <span>Edit Details</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteInventoryItem(item)}
-                          className="flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50/60 hover:bg-red-50 px-2.5 py-1.5 rounded-xl border border-red-200 transition-colors"
-                          title="Delete from Inventory"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Remove</span>
-                        </button>
-                      </div>
+            {/* VIEW MODE 1: GRID CARDS VIEW */}
+            {inventoryViewMode === "cards" && (
+              <>
+                {filteredOfficeInventory.length === 0 ? (
+                  <div className="bg-white rounded-3xl border border-natural-border p-12 text-center shadow-subtle space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center mx-auto">
+                      <Boxes className="w-6 h-6" />
                     </div>
-                  );
-                })}
-              </div>
+                    <h3 className="font-serif text-lg font-bold text-natural-text">
+                      No inventory items found
+                    </h3>
+                    <p className="text-xs text-natural-muted max-w-sm mx-auto">
+                      {inventorySearchQuery
+                        ? `No items matching "${inventorySearchQuery}". Try clearing search or changing category.`
+                        : `No items logged in category "${selectedInventoryCategory}". Add crates, chairs, or supplies now.`}
+                    </p>
+                    <div className="pt-2 flex items-center justify-center gap-2">
+                      {inventorySearchQuery && (
+                        <Button size="sm" variant="outline" onClick={() => setInventorySearchQuery("")}>
+                          Clear Search
+                        </Button>
+                      )}
+                      {selectedInventoryCategory !== "All" && (
+                        <Button size="sm" variant="outline" onClick={() => setSelectedInventoryCategory("All")}>
+                          View All Categories
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => {
+                          if (selectedInventoryCategory !== "All") {
+                            setInventoryForm((prev) => ({ ...prev, category: selectedInventoryCategory }));
+                          }
+                          setShowAddInventoryModal(true);
+                        }}
+                        className="bg-indigo-700 hover:bg-indigo-800 text-white"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" />
+                        <span>Add Item</span>
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {filteredOfficeInventory.map((item) => {
+                      return (
+                        <div
+                          key={item.id}
+                          className="bg-white rounded-2xl border border-natural-border shadow-subtle p-3.5 flex flex-col justify-between hover:shadow-md transition-all space-y-2.5"
+                        >
+                          {/* Top Badges (Category & Location) */}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-bold text-indigo-900 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-md truncate max-w-[170px]">
+                              {item.category}
+                            </span>
+
+                            {item.location && (
+                              <span className="text-[10px] text-natural-muted font-medium truncate max-w-[140px]" title={item.location}>
+                                {item.location}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Compact Item Image Banner */}
+                          {item.image_url && (
+                            <div className="relative h-28 w-full rounded-xl overflow-hidden bg-natural-surface border border-natural-border shadow-2xs">
+                              <img
+                                src={item.image_url}
+                                alt={item.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+
+                          {/* Item Title */}
+                          <div>
+                            <h3 className="font-serif text-base font-bold text-natural-text leading-snug line-clamp-1" title={item.name}>
+                              {item.name}
+                            </h3>
+                          </div>
+
+                          {/* Compact Count & Steppers Row */}
+                          <div className="bg-natural-warmWhite/90 border border-natural-border rounded-xl px-2.5 py-1.5 flex items-center justify-between">
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-natural-muted">Count:</span>
+                              <span className="font-serif text-lg font-extrabold text-brand-950">
+                                {item.quantity}
+                              </span>
+                              <span className="text-[11px] font-semibold text-natural-muted">
+                                {item.unit || "units"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-0.5">
+                              <button
+                                type="button"
+                                onClick={() => handleAdjustInventoryCount(item, -5)}
+                                disabled={item.quantity <= 0}
+                                className="px-1.5 py-0.5 bg-white hover:bg-natural-surface text-natural-text disabled:opacity-40 border border-natural-border rounded text-[10px] font-bold transition-colors shadow-2xs"
+                                title="Subtract 5"
+                              >
+                                -5
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleAdjustInventoryCount(item, -1)}
+                                disabled={item.quantity <= 0}
+                                className="p-1 bg-white hover:bg-natural-surface text-natural-text disabled:opacity-40 border border-natural-border rounded text-xs font-bold transition-colors shadow-2xs"
+                                title="Subtract 1"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleAdjustInventoryCount(item, 1)}
+                                className="p-1 bg-white hover:bg-natural-surface text-natural-text border border-natural-border rounded text-xs font-bold transition-colors shadow-2xs"
+                                title="Add 1"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleAdjustInventoryCount(item, 5)}
+                                className="px-1.5 py-0.5 bg-white hover:bg-natural-surface text-natural-text border border-natural-border rounded text-[10px] font-bold transition-colors shadow-2xs"
+                                title="Add 5"
+                              >
+                                +5
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Quick Actions (Adjust Stock & History) */}
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openAdjustModal(item)}
+                              className="w-full py-1.5 px-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-950 text-[11px] font-bold text-center border border-indigo-200 transition-colors"
+                            >
+                              Log / Adjust
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => openItemHistoryModal(item)}
+                              className="w-full py-1.5 px-2 rounded-lg bg-natural-surface hover:bg-natural-border/70 text-natural-text text-[11px] font-bold text-center border border-natural-border transition-colors"
+                            >
+                              History
+                            </button>
+                          </div>
+
+                          {/* Edit Details & Delete Footer */}
+                          <div className="pt-1.5 border-t border-natural-border/60 flex items-center justify-between text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() => openEditInventoryModal(item)}
+                              className="font-semibold text-natural-muted hover:text-indigo-700 transition-colors"
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteInventoryItem(item)}
+                              className="font-semibold text-red-600 hover:text-red-700 transition-colors"
+                              title="Delete from Inventory"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
+
+            {/* VIEW MODE 2: STOCK MOVEMENT HISTORY (BAR GRAPH + AUDIT LOG) */}
+            {inventoryViewMode === "history" && (
+              <div className="space-y-6">
+                {/* Stock Movement History Bar Graph */}
+                <BarGraph
+                  title="Stock Movement History & Comparison"
+                  subtitle="Visualizes when we had how much: Yesterday vs. Now count movements across all supplies"
+                  mode="comparison"
+                  data={officeInventory.map((item) => ({
+                    id: item.id,
+                    label: item.name,
+                    category: item.category,
+                    currentValue: item.quantity,
+                    previousValue: item.last_previous_quantity ?? undefined,
+                    unit: item.unit,
+                    notes: item.last_notes ?? undefined,
+                  }))}
+                />
+
+                <div className="bg-white rounded-3xl border border-natural-border shadow-subtle p-6 space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-natural-border pb-4">
+                    <div>
+                      <h3 className="font-serif text-xl font-bold text-natural-text">
+                        Stock Movement Audit Log
+                      </h3>
+                      <p className="text-xs text-natural-muted mt-0.5">
+                        Chronological history of supplies count changes, recording when we had how much (e.g. Yesterday vs Now).
+                      </p>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setInventoryViewMode("cards")}
+                      className="border-indigo-200 text-indigo-900 hover:bg-indigo-50"
+                    >
+                      <span>← Back to Grid View</span>
+                    </Button>
+                  </div>
+
+                {filteredHistory.length === 0 ? (
+                  <div className="text-center py-12 space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center mx-auto">
+                      <Clock className="w-6 h-6" />
+                    </div>
+                    <h4 className="font-serif text-base font-bold text-natural-text">
+                      No stock movement logs found
+                    </h4>
+                    <p className="text-xs text-natural-muted max-w-sm mx-auto">
+                      {historyFilterType !== "All"
+                        ? `No movement records with type "${historyFilterType}". Try selecting "All Movements".`
+                        : "Use the \"Log Count / Adjust\" button on any inventory item to record a count change."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-natural-border overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="text-natural-muted font-bold uppercase tracking-wider text-[10px] bg-natural-surface/60 border-y border-natural-border">
+                          <th className="py-3 px-4">Date / Time</th>
+                          <th className="py-3 px-4">Item & Category</th>
+                          <th className="py-3 px-4 text-center">Movement Flow</th>
+                          <th className="py-3 px-4 text-center">Difference</th>
+                          <th className="py-3 px-4">Type</th>
+                          <th className="py-3 px-4">Notes / Explanation</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-natural-border/70">
+                        {filteredHistory.map((hist) => {
+                          const isPositive = hist.change_amount >= 0;
+                          const isZero = hist.change_amount === 0;
+
+                          const typeBadge =
+                            hist.change_type === "restock"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : hist.change_type === "usage"
+                              ? "bg-amber-50 text-amber-900 border-amber-200"
+                              : hist.change_type === "damaged"
+                              ? "bg-red-50 text-red-800 border-red-200"
+                              : hist.change_type === "initial_stock"
+                              ? "bg-indigo-50 text-indigo-900 border-indigo-200"
+                              : "bg-blue-50 text-blue-900 border-blue-200";
+
+                          return (
+                            <tr key={hist.id} className="hover:bg-natural-warmWhite/80 transition-colors">
+                              <td className="py-3.5 px-4 font-medium whitespace-nowrap text-natural-text">
+                                <span className="font-bold block text-natural-text">
+                                  {formatHistoryDate(hist.recorded_at)}
+                                </span>
+                              </td>
+
+                              <td className="py-3.5 px-4">
+                                <span className="font-bold text-natural-text block text-sm">
+                                  {hist.item_name}
+                                </span>
+                                <span className="text-[11px] text-indigo-900 font-semibold bg-indigo-50 px-2 py-0.5 rounded-md inline-block mt-0.5">
+                                  {hist.category}
+                                </span>
+                              </td>
+
+                              <td className="py-3.5 px-4 text-center font-mono">
+                                <div className="inline-flex items-center gap-1.5 bg-natural-surface px-2.5 py-1 rounded-xl border border-natural-border">
+                                  <span className="text-natural-muted font-bold">{hist.previous_quantity}</span>
+                                  <span className="text-indigo-400 font-bold">➔</span>
+                                  <span className="font-extrabold text-brand-950 text-sm">
+                                    {hist.new_quantity} {hist.unit}
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="py-3.5 px-4 text-center">
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold border ${
+                                    isPositive
+                                      ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                      : isZero
+                                      ? "bg-gray-100 text-gray-800 border-gray-300"
+                                      : "bg-rose-100 text-rose-900 border-rose-300"
+                                  }`}
+                                >
+                                  {isPositive && !isZero ? (
+                                    <ArrowUpRight className="w-3.5 h-3.5 text-emerald-700" />
+                                  ) : !isPositive ? (
+                                    <ArrowDownRight className="w-3.5 h-3.5 text-rose-700" />
+                                  ) : null}
+                                  <span>
+                                    {isPositive && !isZero ? `+${hist.change_amount}` : hist.change_amount}{" "}
+                                    {hist.unit}
+                                  </span>
+                                </span>
+                              </td>
+
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${typeBadge}`}>
+                                  {hist.change_type.replace(/_/g, " ")}
+                                </span>
+                              </td>
+
+                              <td className="py-3.5 px-4 text-natural-muted text-xs max-w-xs">
+                                {hist.notes || "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           </div>
         )}
 
@@ -3272,18 +3565,13 @@ export default function AdminDashboardPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-8 border border-natural-border shadow-elevated space-y-5 sm:space-y-6 my-auto max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-natural-border pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
-                  <Boxes className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-serif text-xl font-bold text-natural-text">
-                    Add Office or Farm Asset
-                  </h3>
-                  <p className="text-xs text-natural-muted">
-                    Log new non-crop physical equipment, crates, furniture, or supplies
-                  </p>
-                </div>
+              <div>
+                <h3 className="font-serif text-xl font-bold text-natural-text">
+                  Add Office or Farm Asset
+                </h3>
+                <p className="text-xs text-natural-muted">
+                  Log new non-crop physical equipment, crates, furniture, or supplies
+                </p>
               </div>
               <button
                 onClick={() => setShowAddInventoryModal(false)}
@@ -3342,26 +3630,35 @@ export default function AdminDashboardPage() {
                     </p>
                   </div>
                 ) : (
-                  <select
+                  <Dropdown
                     value={inventoryForm.category}
-                    onChange={(e) => {
-                      if (e.target.value === "__NEW__") {
+                    onChange={(val) => {
+                      if (val === "__NEW__") {
                         setIsCreatingNewCategory(true);
                       } else {
-                        setInventoryForm({ ...inventoryForm, category: e.target.value });
+                        setInventoryForm({ ...inventoryForm, category: val });
                       }
                     }}
-                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600 font-medium"
-                  >
-                    {officeCategories.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                    <option value="__NEW__">+ Add Custom Category...</option>
-                  </select>
+                    options={[
+                      ...officeCategories.map((cat) => ({
+                        value: cat,
+                        label: cat,
+                        badge: `${officeInventory.filter((i) => i.category === cat).length} items`,
+                      })),
+                      { value: "__NEW__", label: "+ Add Custom Category..." },
+                    ]}
+                    placeholder="Select category"
+                  />
                 )}
               </div>
+
+              {/* Service / Item Image Upload */}
+              <ImageUpload
+                label="Item or Service Image"
+                value={inventoryForm.image_url}
+                onChange={(url) => setInventoryForm({ ...inventoryForm, image_url: url })}
+                helperText="Upload a photo or choose a preset icon. Displayed in Catalogue and Office Inventory."
+              />
 
               {/* Quantity and Unit */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -3397,36 +3694,18 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Location and Condition */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
-                    Physical Location
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Packhouse Rack 2, Office Room A"
-                    value={inventoryForm.location}
-                    onChange={(e) => setInventoryForm({ ...inventoryForm, location: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
-                    Condition
-                  </label>
-                  <select
-                    value={inventoryForm.condition}
-                    onChange={(e) => setInventoryForm({ ...inventoryForm, condition: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600 font-medium"
-                  >
-                    <option value="New">New (Mint)</option>
-                    <option value="Good">Good (Working)</option>
-                    <option value="Fair">Fair (Operational)</option>
-                    <option value="Needs Repair">Needs Repair / Maintenance</option>
-                  </select>
-                </div>
+              {/* Location */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                  Physical Location (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Packhouse Rack 2, Office Room A"
+                  value={inventoryForm.location}
+                  onChange={(e) => setInventoryForm({ ...inventoryForm, location: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600"
+                />
               </div>
 
               {/* Notes */}
@@ -3474,18 +3753,13 @@ export default function AdminDashboardPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-8 border border-natural-border shadow-elevated space-y-5 sm:space-y-6 my-auto max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-natural-border pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
-                  <Pencil className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-serif text-xl font-bold text-natural-text">
-                    Edit Inventory Item
-                  </h3>
-                  <p className="text-xs text-natural-muted">
-                    Update counts, location, category, or condition status
-                  </p>
-                </div>
+              <div>
+                <h3 className="font-serif text-xl font-bold text-natural-text">
+                  Edit Inventory Item
+                </h3>
+                <p className="text-xs text-natural-muted">
+                  Update counts, location, category, or specifications
+                </p>
               </div>
               <button
                 onClick={() => setEditingInventoryItem(null)}
@@ -3538,26 +3812,35 @@ export default function AdminDashboardPage() {
                     autoFocus
                   />
                 ) : (
-                  <select
+                  <Dropdown
                     value={editInventoryForm.category}
-                    onChange={(e) => {
-                      if (e.target.value === "__NEW__") {
+                    onChange={(val) => {
+                      if (val === "__NEW__") {
                         setIsEditCreatingNewCategory(true);
                       } else {
-                        setEditInventoryForm({ ...editInventoryForm, category: e.target.value });
+                        setEditInventoryForm({ ...editInventoryForm, category: val });
                       }
                     }}
-                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600 font-medium"
-                  >
-                    {officeCategories.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                    <option value="__NEW__">+ Add Custom Category...</option>
-                  </select>
+                    options={[
+                      ...officeCategories.map((cat) => ({
+                        value: cat,
+                        label: cat,
+                        badge: `${officeInventory.filter((i) => i.category === cat).length} items`,
+                      })),
+                      { value: "__NEW__", label: "+ Add Custom Category..." },
+                    ]}
+                    placeholder="Select category"
+                  />
                 )}
               </div>
+
+              {/* Service / Item Image Upload */}
+              <ImageUpload
+                label="Item or Service Image"
+                value={editInventoryForm.image_url}
+                onChange={(url) => setEditInventoryForm({ ...editInventoryForm, image_url: url })}
+                helperText="Upload a photo or choose a preset icon. Displayed in Catalogue and Office Inventory."
+              />
 
               {/* Count and Unit */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -3592,36 +3875,18 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Location and Condition */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
-                    Physical Location
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Packhouse Rack 1"
-                    value={editInventoryForm.location}
-                    onChange={(e) => setEditInventoryForm({ ...editInventoryForm, location: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
-                    Condition
-                  </label>
-                  <select
-                    value={editInventoryForm.condition}
-                    onChange={(e) => setEditInventoryForm({ ...editInventoryForm, condition: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600 font-medium"
-                  >
-                    <option value="New">New (Mint)</option>
-                    <option value="Good">Good (Working)</option>
-                    <option value="Fair">Fair (Operational)</option>
-                    <option value="Needs Repair">Needs Repair / Maintenance</option>
-                  </select>
-                </div>
+              {/* Location */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                  Physical Location (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Packhouse Rack 1"
+                  value={editInventoryForm.location}
+                  onChange={(e) => setEditInventoryForm({ ...editInventoryForm, location: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-xl border border-natural-border bg-natural-warmWhite text-sm focus:outline-none focus:border-indigo-600"
+                />
               </div>
 
               {/* Notes */}
@@ -3669,18 +3934,13 @@ export default function AdminDashboardPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 border border-natural-border shadow-elevated space-y-5 my-auto max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-natural-border pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
-                  <FolderPlus className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-serif text-lg font-bold text-natural-text">
-                    Add New Category
-                  </h3>
-                  <p className="text-[11px] text-natural-muted">
-                    Organize office assets & equipment
-                  </p>
-                </div>
+              <div>
+                <h3 className="font-serif text-lg font-bold text-natural-text">
+                  Add New Category
+                </h3>
+                <p className="text-[11px] text-natural-muted">
+                  Organize office assets & equipment
+                </p>
               </div>
               <button
                 onClick={() => setShowQuickCategoryModal(false)}
@@ -3733,6 +3993,400 @@ export default function AdminDashboardPage() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 8: ADJUST INVENTORY COUNT & LOG STOCK MOVEMENT */}
+      {adjustingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-7 border border-natural-border shadow-elevated space-y-5 my-auto max-h-[92vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-natural-border pb-3">
+              <div>
+                <h3 className="font-serif text-lg font-bold text-natural-text">
+                  Log Count & Stock Movement
+                </h3>
+                <p className="text-xs text-natural-muted">
+                  Record current count or past counts (e.g. yesterday vs today)
+                </p>
+              </div>
+              <button
+                onClick={() => setAdjustingItem(null)}
+                className="text-natural-muted hover:text-natural-text p-1.5 rounded-xl hover:bg-natural-surface"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Target Item summary badge */}
+            <div className="bg-natural-surface/70 rounded-2xl p-3 border border-natural-border flex items-center justify-between gap-3">
+              <div>
+                <span className="text-[11px] font-bold text-indigo-900 bg-indigo-100/80 px-2 py-0.5 rounded-md inline-block mb-1">
+                  {adjustingItem.category}
+                </span>
+                <h4 className="font-serif text-base font-bold text-natural-text">
+                  {adjustingItem.name}
+                </h4>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-[10px] font-bold uppercase text-natural-muted block">
+                  Current On-Hand
+                </span>
+                <span className="font-serif text-xl font-extrabold text-brand-950">
+                  {adjustingItem.quantity} {adjustingItem.unit}
+                </span>
+              </div>
+            </div>
+
+            <form onSubmit={handleConfirmAdjustCount} className="space-y-4">
+              {/* New Quantity Input and Real-Time Diff */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                  New Physical Count ({adjustingItem.unit}) *
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    required
+                    value={adjustForm.quantity}
+                    onChange={(e) =>
+                      setAdjustForm({ ...adjustForm, quantity: Math.max(0, parseInt(e.target.value) || 0) })
+                    }
+                    className="w-full px-4 py-3 rounded-2xl border-2 border-indigo-300 bg-indigo-50/30 text-lg font-extrabold text-indigo-950 focus:outline-none focus:border-indigo-600"
+                    autoFocus
+                  />
+                  <div className="shrink-0 text-center px-4 py-2 bg-natural-warmWhite rounded-2xl border border-natural-border">
+                    <span className="text-[10px] font-bold uppercase text-natural-muted block">Difference</span>
+                    <span
+                      className={`text-sm font-extrabold ${
+                        adjustForm.quantity - adjustingItem.quantity > 0
+                          ? "text-emerald-700"
+                          : adjustForm.quantity - adjustingItem.quantity < 0
+                          ? "text-rose-700"
+                          : "text-natural-muted"
+                      }`}
+                    >
+                      {adjustForm.quantity - adjustingItem.quantity > 0
+                        ? `+${adjustForm.quantity - adjustingItem.quantity}`
+                        : adjustForm.quantity - adjustingItem.quantity}{" "}
+                      {adjustingItem.unit}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Date of Record Selection: Today / Yesterday / Custom */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1.5">
+                  When Was This Count Recorded? *
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAdjustForm({ ...adjustForm, dateChoice: "today" })}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border ${
+                      adjustForm.dateChoice === "today"
+                        ? "bg-indigo-900 text-white border-indigo-900 shadow-xs"
+                        : "bg-white text-natural-text border-natural-border hover:bg-natural-surface"
+                    }`}
+                  >
+                    Today
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAdjustForm({ ...adjustForm, dateChoice: "yesterday" })}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border ${
+                      adjustForm.dateChoice === "yesterday"
+                        ? "bg-indigo-900 text-white border-indigo-900 shadow-xs"
+                        : "bg-white text-natural-text border-natural-border hover:bg-natural-surface"
+                    }`}
+                  >
+                    Yesterday
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAdjustForm({ ...adjustForm, dateChoice: "custom" })}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border ${
+                      adjustForm.dateChoice === "custom"
+                        ? "bg-indigo-900 text-white border-indigo-900 shadow-xs"
+                        : "bg-white text-natural-text border-natural-border hover:bg-natural-surface"
+                    }`}
+                  >
+                    Specific Date
+                  </button>
+                </div>
+
+                {adjustForm.dateChoice === "custom" && (
+                  <div className="mt-2.5">
+                    <input
+                      type="date"
+                      value={adjustForm.customDate}
+                      onChange={(e) => setAdjustForm({ ...adjustForm, customDate: e.target.value })}
+                      className="w-full px-3.5 py-2 rounded-xl border border-natural-border bg-natural-warmWhite text-xs focus:outline-none focus:border-indigo-600 font-semibold"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Movement Reason */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                  Reason for Movement *
+                </label>
+                <Dropdown
+                  value={adjustForm.change_type}
+                  onChange={(val) => setAdjustForm({ ...adjustForm, change_type: val })}
+                  options={[
+                    { value: "restock", label: "Restock / Purchased (+ Inbound)", badge: "Inbound" },
+                    { value: "usage", label: "Used / Consumed / Dispatched (- Outbound)", badge: "Outbound" },
+                    { value: "audit", label: "Physical Stock Count / Audit (Recount)", badge: "Audit" },
+                    { value: "damaged", label: "Damaged / Scrapped / Discarded (- Loss)", badge: "Loss" },
+                    { value: "adjustment", label: "General Count Adjustment", badge: "Adjust" },
+                  ]}
+                  placeholder="Select movement reason"
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-natural-muted block mb-1">
+                  Notes / Explanation (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Received 10 new crates from local market, or recount after yesterday shift"
+                  value={adjustForm.notes}
+                  onChange={(e) => setAdjustForm({ ...adjustForm, notes: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-natural-border bg-natural-warmWhite text-xs focus:outline-none focus:border-indigo-600"
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="pt-3 flex items-center justify-between gap-3 border-t border-natural-border">
+                <Button
+                  variant="outline"
+                  size="md"
+                  type="button"
+                  onClick={() => setAdjustingItem(null)}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  variant="primary"
+                  size="md"
+                  type="submit"
+                  disabled={isSubmittingAdjustment}
+                  className="bg-indigo-700 hover:bg-indigo-800 text-white"
+                >
+                  {isSubmittingAdjustment ? (
+                    <span className="flex items-center gap-1.5">
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Saving...</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5">
+                      <Check className="w-4 h-4" />
+                      <span>Save & Record Movement</span>
+                    </span>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 9: ITEM STOCK MOVEMENT HISTORY TIMELINE */}
+      {selectedItemForHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-7 border border-natural-border shadow-elevated space-y-5 my-auto max-h-[92vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-natural-border pb-3">
+              <div>
+                <h3 className="font-serif text-lg font-bold text-natural-text">
+                  Stock Movement History
+                </h3>
+                <p className="text-xs text-natural-muted">
+                  Full chronological audit trail for this item
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedItemForHistory(null)}
+                className="text-natural-muted hover:text-natural-text p-1.5 rounded-xl hover:bg-natural-surface"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Target Item summary badge */}
+            <div className="bg-indigo-50/60 rounded-2xl p-4 border border-indigo-100 flex items-center justify-between gap-3">
+              <div>
+                <span className="text-[11px] font-bold text-indigo-900 bg-white px-2 py-0.5 rounded-md inline-block mb-1 border border-indigo-200">
+                  {selectedItemForHistory.category}
+                </span>
+                <h4 className="font-serif text-base font-bold text-natural-text">
+                  {selectedItemForHistory.name}
+                </h4>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-[10px] font-bold uppercase text-natural-muted block">
+                  Current Stock
+                </span>
+                <span className="font-serif text-2xl font-extrabold text-brand-950">
+                  {selectedItemForHistory.quantity} {selectedItemForHistory.unit}
+                </span>
+              </div>
+            </div>
+
+            {/* Item Stock History Bar Graph */}
+            <BarGraph
+              title="Stock Level Progression"
+              subtitle={`Chronological count comparison for ${selectedItemForHistory.name}`}
+              mode="comparison"
+              data={
+                itemHistoryList.length > 0
+                  ? [...itemHistoryList].reverse().map((entry, idx) => ({
+                      id: entry.id || `hist-${idx}`,
+                      label: formatHistoryDate(entry.recorded_at),
+                      currentValue: entry.new_quantity,
+                      previousValue: entry.previous_quantity,
+                      unit: entry.unit || selectedItemForHistory.unit,
+                      notes:
+                        entry.notes ||
+                        `${entry.change_type.replace(/_/g, " ")} (${
+                          entry.change_amount >= 0 ? `+${entry.change_amount}` : entry.change_amount
+                        })`,
+                    }))
+                  : [
+                      {
+                        id: selectedItemForHistory.id,
+                        label: "Current Count",
+                        currentValue: selectedItemForHistory.quantity,
+                        previousValue:
+                          selectedItemForHistory.last_previous_quantity ?? selectedItemForHistory.quantity,
+                        unit: selectedItemForHistory.unit,
+                        notes: selectedItemForHistory.last_notes ?? "Current on-hand stock",
+                      },
+                    ]
+              }
+            />
+
+            {/* Timeline content */}
+            <div className="space-y-3">
+              <h5 className="text-xs font-bold uppercase tracking-wider text-natural-muted flex items-center justify-between">
+                <span>Recorded Timeline</span>
+                <span>{itemHistoryList.length} events logged</span>
+              </h5>
+
+              {loadingItemHistory ? (
+                <div className="text-center py-8 text-natural-muted text-xs flex items-center justify-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-indigo-700" />
+                  <span>Loading movement history...</span>
+                </div>
+              ) : itemHistoryList.length === 0 ? (
+                <div className="text-center py-8 bg-natural-surface/60 rounded-2xl border border-natural-border text-xs text-natural-muted space-y-1">
+                  <p className="font-semibold text-natural-text">No recorded stock movements yet.</p>
+                  <p>Use the &ldquo;Log Count / Adjust&rdquo; button to record a count change.</p>
+                </div>
+              ) : (
+                <div className="relative pl-6 space-y-4 before:content-[''] before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-indigo-100">
+                  {itemHistoryList.map((entry, idx) => {
+                    const isPositive = entry.change_amount >= 0;
+                    const isZero = entry.change_amount === 0;
+
+                    return (
+                      <div key={entry.id || idx} className="relative space-y-1.5">
+                        {/* Timeline dot */}
+                        <div
+                          className={`absolute -left-[21px] top-1 w-3.5 h-3.5 rounded-full border-2 border-white shadow-xs ${
+                            isPositive && !isZero
+                              ? "bg-emerald-600"
+                              : !isPositive
+                              ? "bg-rose-600"
+                              : "bg-indigo-600"
+                          }`}
+                        />
+
+                        {/* Date and movement pill */}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-natural-text">
+                            {formatHistoryDate(entry.recorded_at)}
+                          </span>
+
+                          <span
+                            className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                              isPositive && !isZero
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                : !isPositive
+                                ? "bg-rose-50 text-rose-800 border-rose-200"
+                                : "bg-gray-50 text-gray-800 border-gray-200"
+                            }`}
+                          >
+                            {isPositive && !isZero ? `+${entry.change_amount}` : entry.change_amount}{" "}
+                            {entry.unit}
+                          </span>
+                        </div>
+
+                        {/* Card body */}
+                        <div className="bg-natural-warmWhite p-3 rounded-2xl border border-natural-border/80 space-y-1 text-xs">
+                          <div className="flex items-center justify-between font-mono">
+                            <span className="text-natural-muted font-medium">
+                              From <strong className="text-natural-text">{entry.previous_quantity}</strong>
+                            </span>
+                            <span className="text-indigo-400 font-bold">➔</span>
+                            <span className="text-brand-950 font-extrabold">
+                              To <strong>{entry.new_quantity} {entry.unit}</strong>
+                            </span>
+                            <span className="text-[10px] uppercase font-bold text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded ml-2">
+                              {entry.change_type.replace(/_/g, " ")}
+                            </span>
+                          </div>
+
+                          {entry.notes && (
+                            <p className="text-[11px] text-natural-muted/90 italic pt-1 border-t border-natural-border/50">
+                              &ldquo;{entry.notes}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal actions */}
+            <div className="pt-3 flex items-center justify-between gap-3 border-t border-natural-border">
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => setSelectedItemForHistory(null)}
+              >
+                Close
+              </Button>
+
+              <Button
+                variant="primary"
+                size="sm"
+                type="button"
+                onClick={() => {
+                  const target = selectedItemForHistory;
+                  setSelectedItemForHistory(null);
+                  openAdjustModal(target);
+                }}
+                className="bg-indigo-700 hover:bg-indigo-800 text-white"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                <span>Log New Count</span>
+              </Button>
+            </div>
           </div>
         </div>
       )}
